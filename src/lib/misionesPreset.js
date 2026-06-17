@@ -27,6 +27,14 @@ export const FACILES = [
   'Pídele una receta de tapa típica a alguien del bar',
   'Haz una foto imitando una estatua o cartel de la calle',
   'Consigue que {X} se ponga tus gafas/gorra para una foto',
+  'Imita a {X} hablando y que el grupo adivine que es él/ella',
+  'Imita la risa de {X}',
+  'Imita a {X} andando por la calle 10 metros',
+  'Imita a {X} pidiendo en la barra',
+  'Imita la cara que pone {X} cuando bebe un chupito',
+  'Imita a {X} bailando',
+  'Imita una frase típica que siempre dice {X}',
+  'Imita a {X} haciéndose un selfie',
 ]
 
 export const DIFICILES = [
@@ -50,6 +58,9 @@ export const DIFICILES = [
   'Consigue una servilleta firmada por el camarero como "trofeo"',
   'Haz que {X} cante el estribillo de una canción a pleno pulmón',
   'Organiza que todo el grupo cambie de sitio/bar en menos de 10 min',
+  'Imita a {X} durante 5 minutos seguidos sin que se enfade',
+  'Haz una imitación de {X} delante de un desconocido y que se ría',
+  'Graba un vídeo imitando a {X} y que él/ella le dé el visto bueno',
 ]
 
 // Misiones de dificultad media (2 puntos). El admin las puede usar al añadir
