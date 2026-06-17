@@ -17,19 +17,22 @@ export default function Resumen() {
   const [usuarios, setUsuarios] = useState([])
   const [consumiciones, setConsumiciones] = useState([]) // solo de hoy
   const [puntos, setPuntos] = useState({}) // puntos de misiones de hoy por usuario
+  const [wrappedActivo, setWrappedActivo] = useState(false)
 
   const cargar = async () => {
     const desde = inicioDeHoyISO()
-    const [u, c, mc] = await Promise.all([
+    const [u, c, mc, v] = await Promise.all([
       supabase.from('usuarios').select('id, nombre, avatar_url'),
       supabase.from('consumiciones').select('usuario_id, tipo, created_at').gte('created_at', desde),
       supabase
         .from('misiones_completadas')
         .select('usuario_id, estado, mision:misiones(puntos, fecha)')
         .eq('estado', 'verificado'),
+      supabase.from('viaje').select('cerrado').eq('id', 1).single(),
     ])
     setUsuarios(u.data ?? [])
     setConsumiciones(c.data ?? [])
+    setWrappedActivo(!!v.data?.cerrado)
 
     const pts = {}
     for (const row of mc.data ?? []) {
@@ -46,6 +49,7 @@ export default function Resumen() {
       .channel('resumen')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'consumiciones' }, cargar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'misiones_completadas' }, cargar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'viaje' }, cargar)
       .subscribe()
     return () => supabase.removeChannel(canal)
   }, [])
@@ -82,10 +86,10 @@ export default function Resumen() {
   const maquina = lider(cuentaPorUsuario())
   const reyPotadas = lider(cuentaPorUsuario('potada'))
 
-  const cerrarViaje = async () => {
+  const activarWrapped = async () => {
     if (
       !window.confirm(
-        '🎬 ¿Cerrar el viaje y generar el Wrapped final?\n\nSe mostrará a todo el grupo el conteo total con todas las estadísticas. Podrás reabrirlo luego si quieres.',
+        '🎬 ¿Activar el Wrapped del viaje?\n\nSe mostrará a todo el grupo el conteo total con todas las estadísticas. Podrás cerrarlo cuando quieras.',
       )
     ) {
       return
@@ -94,6 +98,10 @@ export default function Resumen() {
       .from('viaje')
       .update({ cerrado: true, cerrado_at: new Date().toISOString() })
       .eq('id', 1)
+  }
+
+  const cerrarWrapped = async () => {
+    await supabase.from('viaje').update({ cerrado: false, cerrado_at: null }).eq('id', 1)
   }
 
   const fechaBonita = new Date().toLocaleDateString('es-ES', {
@@ -158,19 +166,36 @@ export default function Resumen() {
         El resumen se reinicia cada día a medianoche.
       </p>
 
-      {/* Wrapped final (admin) */}
+      {/* Wrapped final (solo admin lo activa/cierra) */}
       {usuario.es_admin && (
         <div className="rounded-2xl bg-gradient-to-br from-purple-600/20 to-fuchsia-700/10 ring-1 ring-purple-400/30 p-4 text-center">
           <p className="text-white font-bold">🎬 Wrapped del viaje</p>
-          <p className="text-white/50 text-xs mb-3">
-            Cuando se acabe todo, ciérralo y se genera el resumen total para el grupo.
-          </p>
-          <button
-            onClick={cerrarViaje}
-            className="w-full rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5"
-          >
-            Cerrar viaje y generar Wrapped
-          </button>
+          {!wrappedActivo ? (
+            <>
+              <p className="text-white/50 text-xs mb-3">
+                Cuando se acabe todo, actívalo y se genera el resumen total para el grupo.
+                (Hasta que no le des, no aparece a nadie.)
+              </p>
+              <button
+                onClick={activarWrapped}
+                className="w-full rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5"
+              >
+                🎬 Activar Wrapped del viaje
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-emerald-300 text-xs mb-3">
+                ✅ El Wrapped está activo y visible para todo el grupo.
+              </p>
+              <button
+                onClick={cerrarWrapped}
+                className="w-full rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold py-2.5"
+              >
+                Cerrar Wrapped
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

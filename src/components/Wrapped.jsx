@@ -183,7 +183,7 @@ export default function Wrapped({ onClose }) {
               onClick={reabrir}
               className="w-full rounded-xl bg-white/10 hover:bg-white/20 text-white py-2.5 text-sm"
             >
-              🔓 Reabrir el viaje (admin)
+              🔒 Cerrar Wrapped (admin)
             </button>
           )}
         </div>
