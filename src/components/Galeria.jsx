@@ -97,6 +97,13 @@ export default function Galeria() {
     }
   }
 
+  const borrarAmpliada = async () => {
+    const borrada = ampliada
+    if (!window.confirm('¿Borrar esto del álbum?')) return
+    setAmpliada(null)
+    await supabase.from('fotos').delete().eq('id', borrada.id)
+  }
+
   const elegir = async (e) => {
     const file = e.target.files?.[0]
     if (inputFoto.current) inputFoto.current.value = ''
@@ -264,66 +271,79 @@ export default function Galeria() {
         </div>
       )}
 
-      {/* Foto ampliada */}
+      {/* Foto/vídeo ampliado */}
       {ampliada && (
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4"
+          className="fixed inset-0 bg-black/95 z-50 overflow-y-auto"
           onClick={() => setAmpliada(null)}
         >
-          {ampliada.tipo === 'video' ? (
-            <video
-              src={ampliada.url}
-              controls
-              autoPlay
-              playsInline
-              onClick={(e) => e.stopPropagation()}
-              className="max-h-[65vh] max-w-full rounded-xl bg-black"
-            />
-          ) : (
-            <img src={ampliada.url} alt="" className="max-h-[65vh] max-w-full rounded-xl" />
-          )}
-          {ampliada.caption && <p className="text-white mt-3 text-center px-4">{ampliada.caption}</p>}
-          <p className="text-white/50 text-sm mt-1">
-            {ampliada.autor?.nombre} · {formatFecha(ampliada.created_at)}
-          </p>
-          {/* Barra de reacciones */}
+          {/* Barra superior fija: cerrar y borrar siempre accesibles */}
           <div
-            className="flex gap-2 mt-4 flex-wrap justify-center"
+            className="sticky top-0 z-10 flex items-center justify-between px-3 py-2 bg-black/60 backdrop-blur"
             onClick={(e) => e.stopPropagation()}
           >
-            {EMOJIS_REACCION.map((emoji) => {
-              const { conteo, mias } = reaccionesDe(ampliada.id)
-              const n = conteo[emoji] ?? 0
-              const yo = mias.has(emoji)
-              return (
-                <button
-                  key={emoji}
-                  onClick={() => toggleReaccion(ampliada.id, emoji)}
-                  className={`rounded-full px-3 py-1.5 text-lg transition ${
-                    yo ? 'bg-amber-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'
-                  }`}
-                >
-                  {emoji} {n > 0 && <span className="text-sm font-bold">{n}</span>}
-                </button>
-              )
-            })}
+            <button
+              onClick={() => setAmpliada(null)}
+              className="text-white text-2xl leading-none px-2 py-1"
+              title="Cerrar"
+            >
+              ✕
+            </button>
+            {(ampliada.usuario_id === usuario.id || usuario.es_admin) && (
+              <button
+                onClick={borrarAmpliada}
+                className="rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold px-3 py-1.5"
+              >
+                🗑️ Borrar {ampliada.usuario_id === usuario.id ? '' : '(admin)'}
+              </button>
+            )}
           </div>
 
-          {/* Borrar (dueño o admin) */}
-          {(ampliada.usuario_id === usuario.id || usuario.es_admin) && (
-            <button
-              onClick={async (e) => {
-                e.stopPropagation()
-                const borrada = ampliada
-                if (!window.confirm('¿Borrar esto del álbum?')) return
-                setAmpliada(null)
-                await supabase.from('fotos').delete().eq('id', borrada.id)
-              }}
-              className="mt-5 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white font-semibold px-5 py-2.5"
+          <div className="flex flex-col items-center p-4 gap-3 pb-12">
+            {ampliada.tipo === 'video' ? (
+              <video
+                src={ampliada.url}
+                controls
+                autoPlay
+                playsInline
+                onClick={(e) => e.stopPropagation()}
+                className="max-h-[60vh] max-w-full rounded-xl bg-black"
+              />
+            ) : (
+              <img
+                src={ampliada.url}
+                alt=""
+                onClick={(e) => e.stopPropagation()}
+                className="max-h-[60vh] max-w-full rounded-xl"
+              />
+            )}
+            {ampliada.caption && <p className="text-white text-center px-4">{ampliada.caption}</p>}
+            <p className="text-white/50 text-sm">
+              {ampliada.autor?.nombre} · {formatFecha(ampliada.created_at)}
+            </p>
+            {/* Barra de reacciones */}
+            <div
+              className="flex gap-2 flex-wrap justify-center"
+              onClick={(e) => e.stopPropagation()}
             >
-              🗑️ Borrar {ampliada.usuario_id === usuario.id ? '' : '(admin)'}
-            </button>
-          )}
+              {EMOJIS_REACCION.map((emoji) => {
+                const { conteo, mias } = reaccionesDe(ampliada.id)
+                const n = conteo[emoji] ?? 0
+                const yo = mias.has(emoji)
+                return (
+                  <button
+                    key={emoji}
+                    onClick={() => toggleReaccion(ampliada.id, emoji)}
+                    className={`rounded-full px-3 py-1.5 text-lg transition ${
+                      yo ? 'bg-amber-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'
+                    }`}
+                  >
+                    {emoji} {n > 0 && <span className="text-sm font-bold">{n}</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>
