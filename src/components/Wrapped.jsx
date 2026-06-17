@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { useUsuario } from '../context/UsuarioContext'
 import { TIPOS, labelDe } from '../lib/consumiciones'
 import Avatar from './Avatar'
+import Logo from './Logo'
 
 export default function Wrapped({ onClose }) {
   const { usuario } = useUsuario()
@@ -108,9 +109,9 @@ export default function Wrapped({ onClose }) {
     <div className="fixed inset-0 z-50 bg-gradient-to-b from-purple-950 via-neutral-950 to-neutral-950 overflow-y-auto">
       <div className="max-w-md mx-auto px-5 py-8 space-y-6">
         <div className="text-center">
-          <p className="text-5xl">🍷✨</p>
-          <h1 className="text-3xl font-black text-white mt-2">Wrapped del Viaje</h1>
-          <p className="text-amber-400 font-bold">Viaje a Jerez</p>
+          <p className="text-5xl">😈✨</p>
+          <h1 className="text-3xl font-black text-white mt-2">Wrapped del Vicio</h1>
+          <Logo size="lg" />
           {fecha && <p className="text-white/40 text-sm mt-1">Cerrado el {fecha}</p>}
         </div>
 
@@ -168,7 +169,7 @@ export default function Wrapped({ onClose }) {
         )}
 
         <p className="text-center text-white/60 text-sm pt-2">
-          ¡Hasta el próximo viaje, panda! 🥃
+          ¡Hasta el próximo vicio, panda! 🥃😈
         </p>
 
         <div className="space-y-2 pt-2">

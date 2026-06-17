@@ -1,7 +1,7 @@
-# Viaje a Jerez 🍷
+# VicioJRZ 😈
 
-App sencilla y de cachondeo para un finde con los colegas en Jerez. Pensada para
-el móvil. Sin contraseñas: entras solo con tu nombre (y una foto si quieres).
+App sencilla y de cachondeo para un finde de vicio con los colegas en Jerez (JRZ).
+Pensada para el móvil. Sin contraseñas: entras solo con tu nombre (y una foto si quieres).
 
 ## ¿Qué hace?
 
@@ -11,7 +11,8 @@ el móvil. Sin contraseñas: entras solo con tu nombre (y una foto si quieres).
   difícil = 3 puntos), de broma y piques sanos entre vosotros. Las pone el
   **administrador**, y él verifica si se han conseguido (o las rechaza).
 - **🏆 Ranking** — dos marcadores: puntos de misiones y "marcador del cuerpo".
-- **📸 Fotos** — galería compartida para las mejores (y peores) fotos del viaje.
+- **📸 Álbum** — galería compartida de fotos y vídeos cortos (máx. 15s), con
+  reacciones, para las mejores (y peores) capturas del viaje.
 
 ## Stack
 

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useUsuario } from '../context/UsuarioContext'
 import Avatar from './Avatar'
+import Logo from './Logo'
 
 export default function Login() {
   const { setUsuario } = useUsuario()
@@ -82,10 +83,12 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
-      <div className="text-6xl mb-2">🍷</div>
-      <h1 className="text-3xl font-black text-white">Viaje a Jerez</h1>
-      <p className="text-white/60 mb-8">Lo que pasa en Jerez... se queda apuntado.</p>
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center relative overflow-hidden">
+      <div className="absolute -top-24 -right-24 w-72 h-72 bg-fuchsia-600/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="text-6xl mb-2">😈</div>
+      <Logo size="xl" />
+      <p className="text-white/60 mb-8 mt-2">Lo que pasa en JRZ... se queda apuntado.</p>
 
       <form onSubmit={entrar} className="w-full max-w-xs space-y-4">
         <button
@@ -126,7 +129,7 @@ export default function Login() {
           disabled={cargando}
           className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold py-3 text-lg transition"
         >
-          {cargando ? 'Entrando…' : '¡Entrar al viaje!'}
+          {cargando ? 'Entrando…' : '¡Entrar al vicio!'}
         </button>
       </form>
 

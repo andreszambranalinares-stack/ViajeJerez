@@ -10,6 +10,7 @@ import Resumen from './components/Resumen'
 import Wrapped from './components/Wrapped'
 import Ajustes from './components/Ajustes'
 import Avatar from './components/Avatar'
+import Logo from './components/Logo'
 
 const TABS = [
   { id: 'contador', label: 'Contador', emoji: '🍻' },
@@ -83,8 +84,8 @@ function AppInterna() {
       <header className="sticky top-0 z-30 bg-neutral-950/80 backdrop-blur border-b border-white/10">
         <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🍷</span>
-            <span className="text-white font-black">Viaje a Jerez</span>
+            <span className="text-xl">😈</span>
+            <Logo size="md" />
           </div>
           <button onClick={() => setAjustes(true)} className="flex items-center gap-2">
             {usuario.es_admin && <span className="text-amber-400 text-sm">👑</span>}
