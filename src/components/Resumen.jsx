@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPOS, emojiDe, labelDe } from '../lib/consumiciones'
+import { useUsuario } from '../context/UsuarioContext'
+import { TIPOS, labelDe } from '../lib/consumiciones'
 import Avatar from './Avatar'
 
 const hoy = () => new Date().toLocaleDateString('sv')
@@ -12,6 +13,7 @@ function inicioDeHoyISO() {
 }
 
 export default function Resumen() {
+  const { usuario } = useUsuario()
   const [usuarios, setUsuarios] = useState([])
   const [consumiciones, setConsumiciones] = useState([]) // solo de hoy
   const [puntos, setPuntos] = useState({}) // puntos de misiones de hoy por usuario
@@ -80,6 +82,20 @@ export default function Resumen() {
   const maquina = lider(cuentaPorUsuario())
   const reyPotadas = lider(cuentaPorUsuario('potada'))
 
+  const cerrarViaje = async () => {
+    if (
+      !window.confirm(
+        '🎬 ¿Cerrar el viaje y generar el Wrapped final?\n\nSe mostrará a todo el grupo el conteo total con todas las estadísticas. Podrás reabrirlo luego si quieres.',
+      )
+    ) {
+      return
+    }
+    await supabase
+      .from('viaje')
+      .update({ cerrado: true, cerrado_at: new Date().toISOString() })
+      .eq('id', 1)
+  }
+
   const fechaBonita = new Date().toLocaleDateString('es-ES', {
     weekday: 'long',
     day: 'numeric',
@@ -141,6 +157,22 @@ export default function Resumen() {
       <p className="text-center text-white/30 text-xs">
         El resumen se reinicia cada día a medianoche.
       </p>
+
+      {/* Wrapped final (admin) */}
+      {usuario.es_admin && (
+        <div className="rounded-2xl bg-gradient-to-br from-purple-600/20 to-fuchsia-700/10 ring-1 ring-purple-400/30 p-4 text-center">
+          <p className="text-white font-bold">🎬 Wrapped del viaje</p>
+          <p className="text-white/50 text-xs mb-3">
+            Cuando se acabe todo, ciérralo y se genera el resumen total para el grupo.
+          </p>
+          <button
+            onClick={cerrarViaje}
+            className="w-full rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5"
+          >
+            Cerrar viaje y generar Wrapped
+          </button>
+        </div>
+      )}
     </div>
   )
 }

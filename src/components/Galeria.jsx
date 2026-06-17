@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useUsuario } from '../context/UsuarioContext'
+import { EMOJIS_REACCION } from '../lib/reacciones'
 import Avatar from './Avatar'
 
 function formatFecha(iso) {
@@ -16,6 +17,7 @@ function formatFecha(iso) {
 export default function Galeria() {
   const { usuario } = useUsuario()
   const [fotos, setFotos] = useState([])
+  const [reacciones, setReacciones] = useState([]) // todas las reacciones
   const [subiendo, setSubiendo] = useState(false)
   const [ampliada, setAmpliada] = useState(null)
   // Foto elegida y a la espera de añadirle texto antes de publicar.
@@ -24,11 +26,15 @@ export default function Galeria() {
   const inputFoto = useRef(null)
 
   const cargar = async () => {
-    const { data } = await supabase
-      .from('fotos')
-      .select('*, autor:usuarios(nombre, avatar_url)')
-      .order('created_at', { ascending: false })
-    setFotos(data ?? [])
+    const [f, r] = await Promise.all([
+      supabase
+        .from('fotos')
+        .select('*, autor:usuarios(nombre, avatar_url)')
+        .order('created_at', { ascending: false }),
+      supabase.from('reacciones').select('foto_id, usuario_id, emoji'),
+    ])
+    setFotos(f.data ?? [])
+    setReacciones(r.data ?? [])
   }
 
   useEffect(() => {
@@ -36,9 +42,43 @@ export default function Galeria() {
     const canal = supabase
       .channel('fotos')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fotos' }, cargar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reacciones' }, cargar)
       .subscribe()
     return () => supabase.removeChannel(canal)
   }, [])
+
+  // Total de reacciones de una foto.
+  const totalReacciones = (fotoId) => reacciones.filter((r) => r.foto_id === fotoId).length
+
+  // Cuántas de cada emoji + si yo he reaccionado con ese emoji.
+  const reaccionesDe = (fotoId) => {
+    const conteo = {}
+    let mias = new Set()
+    for (const r of reacciones) {
+      if (r.foto_id !== fotoId) continue
+      conteo[r.emoji] = (conteo[r.emoji] ?? 0) + 1
+      if (r.usuario_id === usuario.id) mias.add(r.emoji)
+    }
+    return { conteo, mias }
+  }
+
+  const toggleReaccion = async (fotoId, emoji) => {
+    const yaReaccione = reacciones.some(
+      (r) => r.foto_id === fotoId && r.usuario_id === usuario.id && r.emoji === emoji,
+    )
+    if (yaReaccione) {
+      await supabase
+        .from('reacciones')
+        .delete()
+        .eq('foto_id', fotoId)
+        .eq('usuario_id', usuario.id)
+        .eq('emoji', emoji)
+    } else {
+      await supabase
+        .from('reacciones')
+        .insert({ foto_id: fotoId, usuario_id: usuario.id, emoji })
+    }
+  }
 
   const elegir = (e) => {
     const file = e.target.files?.[0]
@@ -113,6 +153,11 @@ export default function Galeria() {
                 {f.caption && <p className="text-white/90 text-xs truncate mt-0.5">{f.caption}</p>}
                 <p className="text-white/50 text-[10px] mt-0.5">{formatFecha(f.created_at)}</p>
               </div>
+              {totalReacciones(f.id) > 0 && (
+                <span className="absolute top-1 left-1 bg-black/50 text-white text-xs rounded-full px-2 py-0.5">
+                  ❤️ {totalReacciones(f.id)}
+                </span>
+              )}
               {(f.usuario_id === usuario.id || usuario.es_admin) && (
                 <button
                   onClick={() => borrar(f)}
@@ -173,11 +218,33 @@ export default function Galeria() {
           className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4"
           onClick={() => setAmpliada(null)}
         >
-          <img src={ampliada.url} alt="" className="max-h-[75vh] max-w-full rounded-xl" />
+          <img src={ampliada.url} alt="" className="max-h-[65vh] max-w-full rounded-xl" />
           {ampliada.caption && <p className="text-white mt-3 text-center px-4">{ampliada.caption}</p>}
           <p className="text-white/50 text-sm mt-1">
             {ampliada.autor?.nombre} · {formatFecha(ampliada.created_at)}
           </p>
+          {/* Barra de reacciones */}
+          <div
+            className="flex gap-2 mt-4 flex-wrap justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {EMOJIS_REACCION.map((emoji) => {
+              const { conteo, mias } = reaccionesDe(ampliada.id)
+              const n = conteo[emoji] ?? 0
+              const yo = mias.has(emoji)
+              return (
+                <button
+                  key={emoji}
+                  onClick={() => toggleReaccion(ampliada.id, emoji)}
+                  className={`rounded-full px-3 py-1.5 text-lg transition ${
+                    yo ? 'bg-amber-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
+                >
+                  {emoji} {n > 0 && <span className="text-sm font-bold">{n}</span>}
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>

@@ -79,6 +79,28 @@ create table if not exists public.misiones_completadas (
 
 create index if not exists misiones_comp_usuario_idx on public.misiones_completadas(usuario_id);
 
+-- ---------- Reacciones a las fotos (emojis) ----------
+create table if not exists public.reacciones (
+  id          uuid primary key default gen_random_uuid(),
+  foto_id     uuid not null references public.fotos(id) on delete cascade,
+  usuario_id  uuid not null references public.usuarios(id) on delete cascade,
+  emoji       text not null,
+  created_at  timestamptz not null default now(),
+  unique (foto_id, usuario_id, emoji)
+);
+
+create index if not exists reacciones_foto_idx on public.reacciones(foto_id);
+
+-- ---------- Estado del viaje (para cerrar y generar el Wrapped) ----------
+create table if not exists public.viaje (
+  id          int primary key default 1,
+  cerrado     boolean not null default false,
+  cerrado_at  timestamptz,
+  constraint viaje_singleton check (id = 1)
+);
+
+insert into public.viaje (id, cerrado) values (1, false) on conflict (id) do nothing;
+
 -- ============================================================
 --  Row Level Security: abierto al rol anónimo (app privada)
 -- ============================================================
@@ -87,6 +109,8 @@ alter table public.consumiciones        enable row level security;
 alter table public.fotos                enable row level security;
 alter table public.misiones             enable row level security;
 alter table public.misiones_completadas enable row level security;
+alter table public.reacciones           enable row level security;
+alter table public.viaje                enable row level security;
 
 -- Borramos políticas previas si re-ejecutas el script
 drop policy if exists "acceso_libre_usuarios"      on public.usuarios;
@@ -94,6 +118,8 @@ drop policy if exists "acceso_libre_consumiciones" on public.consumiciones;
 drop policy if exists "acceso_libre_fotos"         on public.fotos;
 drop policy if exists "acceso_libre_misiones"      on public.misiones;
 drop policy if exists "acceso_libre_misiones_comp" on public.misiones_completadas;
+drop policy if exists "acceso_libre_reacciones"    on public.reacciones;
+drop policy if exists "acceso_libre_viaje"         on public.viaje;
 
 create policy "acceso_libre_usuarios" on public.usuarios
   for all to anon, authenticated using (true) with check (true);
@@ -110,6 +136,12 @@ create policy "acceso_libre_misiones" on public.misiones
 create policy "acceso_libre_misiones_comp" on public.misiones_completadas
   for all to anon, authenticated using (true) with check (true);
 
+create policy "acceso_libre_reacciones" on public.reacciones
+  for all to anon, authenticated using (true) with check (true);
+
+create policy "acceso_libre_viaje" on public.viaje
+  for all to anon, authenticated using (true) with check (true);
+
 -- ============================================================
 --  Realtime: que se actualice en vivo en el móvil de todos
 -- ============================================================
@@ -118,6 +150,8 @@ alter publication supabase_realtime add table public.consumiciones;
 alter publication supabase_realtime add table public.fotos;
 alter publication supabase_realtime add table public.misiones;
 alter publication supabase_realtime add table public.misiones_completadas;
+alter publication supabase_realtime add table public.reacciones;
+alter publication supabase_realtime add table public.viaje;
 
 -- ============================================================
 --  Políticas de Storage (para subir avatares y fotos desde anon)
