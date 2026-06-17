@@ -88,34 +88,54 @@ function aleatorio(lista, n) {
   return out
 }
 
-// Genera 3 misiones (2 fáciles, 1 difícil). Si pasas una lista de usuarios,
-// asigna objetivos aleatorios a las que llevan {X}.
-export function generarMisionesDelDia(usuarios = []) {
-  const conObjetivo = (plantilla, dificultad, puntos) => {
-    let objetivo = null
-    if (plantilla.includes('{X}') && usuarios.length) {
-      objetivo = usuarios[Math.floor(Math.random() * usuarios.length)]
-    }
-    return {
-      titulo: rellena(plantilla, objetivo?.nombre),
-      dificultad,
-      puntos,
-      objetivo_id: objetivo?.id ?? null,
-    }
-  }
+function barajar(lista) {
+  return aleatorio(lista, lista.length)
+}
 
-  const faciles = aleatorio(FACILES, 2).map((p) => conObjetivo(p, 'facil', 1))
-  const dificil = aleatorio(DIFICILES, 1).map((p) => conObjetivo(p, 'dificil', 3))
-  return [...faciles, ...dificil]
+// Elige un objetivo aleatorio para una plantilla con {X}, evitando al propio dueño.
+function objetivoPara(plantilla, dueño, todos) {
+  if (!plantilla.includes('{X}')) return null
+  const otros = todos.filter((u) => u.id !== dueño?.id)
+  const pool = otros.length ? otros : todos
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null
+}
+
+function crearMision(plantilla, dificultad, puntos, dueño, todos) {
+  const objetivo = objetivoPara(plantilla, dueño, todos)
+  return {
+    titulo: rellena(plantilla, objetivo?.nombre),
+    dificultad,
+    puntos,
+    objetivo_id: objetivo?.id ?? null,
+    propietario_id: dueño.id,
+  }
+}
+
+// Genera misiones PERSONALES para cada destinatario: 2 fáciles + 1 difícil,
+// repartiendo del banco sin repetir entre personas ("que ni se rocen").
+// `todos` es la lista completa de usuarios (para asignar objetivos {X}).
+export function generarMisionesParaTodos(destinatarios = [], todos = []) {
+  const faciles = barajar(FACILES)
+  const dificiles = barajar(DIFICILES)
+  let fi = 0
+  let di = 0
+  const out = []
+  for (const u of destinatarios) {
+    out.push(crearMision(faciles[fi++ % faciles.length], 'facil', 1, u, todos))
+    out.push(crearMision(faciles[fi++ % faciles.length], 'facil', 1, u, todos))
+    out.push(crearMision(dificiles[di++ % dificiles.length], 'dificil', 3, u, todos))
+  }
+  return out
 }
 
 // Genera UNA misión difícil al azar (para el re-roll personal de cada uno).
-export function generarUnaDificil(usuarios = []) {
+export function generarUnaDificil(dueño, todos = []) {
   const plantilla = aleatorio(DIFICILES, 1)[0]
-  let objetivo = null
-  if (plantilla.includes('{X}') && usuarios.length) {
-    objetivo = usuarios[Math.floor(Math.random() * usuarios.length)]
+  const objetivo = objetivoPara(plantilla, dueño, todos)
+  return {
+    titulo: rellena(plantilla, objetivo?.nombre),
+    dificultad: 'dificil',
+    puntos: 3,
+    objetivo_id: objetivo?.id ?? null,
   }
-  const titulo = rellena(plantilla, objetivo?.nombre)
-  return { titulo, dificultad: 'dificil', puntos: 3, objetivo_id: objetivo?.id ?? null }
 }

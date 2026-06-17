@@ -53,20 +53,22 @@ alter table public.fotos add column if not exists tipo text not null default 'fo
 create index if not exists fotos_created_idx on public.fotos(created_at desc);
 
 -- ---------- Misiones diarias (de cachondeo) ----------
--- Cada día hay 3: 2 fáciles (1 punto) y 1 difícil (3 puntos).
+-- Cada persona tiene SUS 3 misiones del día: 2 fáciles (1 pto) y 1 difícil (3 ptos).
 create table if not exists public.misiones (
   id           uuid primary key default gen_random_uuid(),
   fecha        date not null default current_date,
   titulo       text not null,
   dificultad   text not null default 'facil' check (dificultad in ('facil','dificil')),
   puntos       int  not null default 1,
-  objetivo_id  uuid references public.usuarios(id) on delete set null, -- "robarle una prenda a X"
-  propietario_id uuid references public.usuarios(id) on delete cascade, -- si está, es una misión personal (re-roll)
+  objetivo_id  uuid references public.usuarios(id) on delete set null,    -- "robarle una prenda a X"
+  propietario_id uuid references public.usuarios(id) on delete cascade,   -- de quién es esta misión
+  es_reroll    boolean not null default false,                            -- difícil cambiada con el re-roll
   created_at   timestamptz not null default now()
 );
 
--- Si ya tenías la tabla creada de antes, añadimos la columna del re-roll:
+-- Si ya tenías la tabla creada de antes, añadimos las columnas nuevas:
 alter table public.misiones add column if not exists propietario_id uuid references public.usuarios(id) on delete cascade;
+alter table public.misiones add column if not exists es_reroll boolean not null default false;
 
 create index if not exists misiones_fecha_idx on public.misiones(fecha desc);
 

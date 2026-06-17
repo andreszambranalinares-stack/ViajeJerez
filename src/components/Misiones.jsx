@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useUsuario } from '../context/UsuarioContext'
-import { generarMisionesDelDia, generarUnaDificil } from '../lib/misionesPreset'
+import { generarMisionesParaTodos, generarUnaDificil } from '../lib/misionesPreset'
 import Avatar from './Avatar'
 
 const hoy = () => new Date().toLocaleDateString('sv') // YYYY-MM-DD local
 
 export default function Misiones() {
   const { usuario } = useUsuario()
-  const [misiones, setMisiones] = useState([]) // todas las de hoy (grupo + personales)
+  const [misiones, setMisiones] = useState([]) // todas las de hoy (de todos)
   const [completadas, setCompletadas] = useState([])
   const [usuarios, setUsuarios] = useState([])
   const [trabajando, setTrabajando] = useState(false)
@@ -44,18 +44,13 @@ export default function Misiones() {
     return () => supabase.removeChannel(canal)
   }, [])
 
-  // ---------- Reparto de misiones ----------
-  const grupo = misiones.filter((m) => !m.propietario_id)
-  const grupoExiste = grupo.length > 0
-  const faciles = grupo.filter((m) => m.dificultad === 'facil')
-  const dificilGrupo = grupo.find((m) => m.dificultad === 'dificil')
-  const miDificil = misiones.find(
-    (m) => m.propietario_id === usuario.id && m.dificultad === 'dificil',
-  )
-  // Lo que ve el jugador actual: 2 fáciles + su difícil (personal si la re-roleó).
-  const misMisiones = [...faciles, miDificil ?? dificilGrupo].filter(Boolean)
+  // ---------- Mis misiones (cada uno las suyas) ----------
+  const misMisiones = misiones.filter((m) => m.propietario_id === usuario.id)
+  const misFaciles = misMisiones.filter((m) => m.dificultad === 'facil')
+  const miDificil = misMisiones.find((m) => m.dificultad === 'dificil')
+  const misOrdenadas = [...misFaciles, miDificil].filter(Boolean)
+  const tengoMisiones = misMisiones.length > 0
 
-  // ---------- Acciones de usuario ----------
   const miEstado = (misionId) =>
     completadas.find((c) => c.mision_id === misionId && c.usuario_id === usuario.id)
 
@@ -75,32 +70,42 @@ export default function Misiones() {
   }
 
   const reRoll = async () => {
-    if (miDificil || !dificilGrupo) return // ya usó su re-roll o no hay difícil aún
+    if (!miDificil || miDificil.es_reroll) return
     setTrabajando(true)
-    // 1) Quitamos mi posible marca en la difícil de grupo (ya no es la mía).
-    const previa = miEstado(dificilGrupo.id)
+    // Quitamos mi marca en la difícil anterior (si la tenía) y la borramos.
+    const previa = miEstado(miDificil.id)
     if (previa) await supabase.from('misiones_completadas').delete().eq('id', previa.id)
-    // 2) Creamos mi difícil personal.
-    const nueva = generarUnaDificil(usuarios)
+    await supabase.from('misiones').delete().eq('id', miDificil.id)
+    // Creamos mi nueva difícil (marcada como re-roll).
+    const nueva = generarUnaDificil(usuario, usuarios)
     await supabase.from('misiones').insert({
       ...nueva,
       fecha: hoy(),
       propietario_id: usuario.id,
+      es_reroll: true,
     })
     setTrabajando(false)
   }
 
-  // ---------- Acciones de admin ----------
-  const generarHoy = async () => {
-    if (grupoExiste) return // solo una vez al día
+  // ---------- Admin ----------
+  // Genera misiones para quien aún no tenga (cubre también a los que se unan tarde).
+  const sinMisiones = usuarios.filter(
+    (u) => !misiones.some((m) => m.propietario_id === u.id),
+  )
+
+  const generar = async () => {
+    if (sinMisiones.length === 0) return
     setTrabajando(true)
-    const nuevas = generarMisionesDelDia(usuarios).map((m) => ({ ...m, fecha: hoy() }))
+    const nuevas = generarMisionesParaTodos(sinMisiones, usuarios).map((m) => ({
+      ...m,
+      fecha: hoy(),
+    }))
     await supabase.from('misiones').insert(nuevas)
     setTrabajando(false)
   }
 
   const borrarTodasHoy = async () => {
-    if (!window.confirm('¿Borrar TODAS las misiones de hoy (incluidos los re-rolls)? Se podrá volver a generar.')) {
+    if (!window.confirm('¿Borrar TODAS las misiones de hoy (de todos)? Se podrá volver a generar.')) {
       return
     }
     await supabase.from('misiones').delete().eq('fecha', hoy())
@@ -113,19 +118,18 @@ export default function Misiones() {
       .eq('id', completada.id)
   }
 
-  const totalHoy = misMisiones.length
-  const verificadasMias = misMisiones.filter(
+  const verificadasMias = misOrdenadas.filter(
     (m) => miEstado(m.id)?.estado === 'verificado',
   ).length
 
   return (
     <div className="space-y-5">
       <div className="text-center">
-        <h2 className="text-white font-black text-lg">🎯 Misiones de hoy</h2>
+        <h2 className="text-white font-black text-lg">🎯 Tus misiones de hoy</h2>
         <p className="text-white/50 text-sm">
-          {grupoExiste
-            ? `Llevas ${verificadasMias}/${totalHoy} verificadas`
-            : 'Aún no hay misiones para hoy'}
+          {tengoMisiones
+            ? `Llevas ${verificadasMias}/${misOrdenadas.length} verificadas`
+            : 'Aún no tienes misiones para hoy'}
         </p>
       </div>
 
@@ -133,13 +137,15 @@ export default function Misiones() {
       {usuario.es_admin && (
         <div className="flex gap-2">
           <button
-            onClick={generarHoy}
-            disabled={trabajando || grupoExiste}
+            onClick={generar}
+            disabled={trabajando || sinMisiones.length === 0}
             className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold py-2 text-sm transition"
           >
-            {grupoExiste ? '✅ Generadas hoy' : '🎲 Generar misiones del día'}
+            {sinMisiones.length === 0
+              ? '✅ Todos tienen misiones'
+              : `🎲 Generar misiones (${sinMisiones.length})`}
           </button>
-          {grupoExiste && (
+          {misiones.length > 0 && (
             <button
               onClick={borrarTodasHoy}
               className="rounded-xl bg-rose-700/80 hover:bg-rose-600 text-white font-semibold py-2 px-3 text-sm transition"
@@ -151,28 +157,25 @@ export default function Misiones() {
         </div>
       )}
 
-      {!grupoExiste && (
+      {!tengoMisiones && (
         <p className="text-white/40 text-center py-8 text-sm">
           {usuario.es_admin
-            ? 'Pulsa "Generar misiones del día" para empezar.'
-            : 'El administrador todavía no ha puesto las misiones de hoy. ¡Paciencia! 😉'}
+            ? 'Pulsa "Generar misiones" para repartir las de hoy.'
+            : 'El administrador todavía no ha repartido las misiones. ¡Paciencia! 😉'}
         </p>
       )}
 
-      {/* Mis misiones (jugador) */}
+      {/* Mis misiones */}
       <div className="space-y-3">
-        {misMisiones.map((m) => {
+        {misOrdenadas.map((m) => {
           const mia = miEstado(m.id)
           const esDificil = m.dificultad === 'dificil'
-          const esPersonal = m.propietario_id === usuario.id
           return (
             <div key={m.id} className="rounded-2xl bg-white/5 p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Badge dificil={esDificil} />
                 <span className="text-amber-400 font-bold text-sm">+{m.puntos} pts</span>
-                {esPersonal && (
-                  <span className="text-sky-300 text-xs">🔁 tu re-roll</span>
-                )}
+                {m.es_reroll && <span className="text-sky-300 text-xs">🔁 re-roll</span>}
               </div>
               <p className="text-white font-medium">{m.titulo}</p>
 
@@ -198,14 +201,13 @@ export default function Misiones() {
                   : '¡La he hecho!'}
               </button>
 
-              {/* Re-roll: solo en la difícil, una vez al día por persona */}
               {esDificil && (
                 <button
                   onClick={reRoll}
-                  disabled={!!miDificil || trabajando || !!mia}
+                  disabled={miDificil?.es_reroll || trabajando || !!mia}
                   className="mt-2 w-full rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 text-white text-sm py-1.5 transition"
                 >
-                  {miDificil ? '🔁 Re-roll ya usado' : '🔁 Cambiar mi difícil (1 vez)'}
+                  {miDificil?.es_reroll ? '🔁 Re-roll ya usado' : '🔁 Cambiar mi difícil (1 vez)'}
                 </button>
               )}
             </div>
@@ -213,51 +215,49 @@ export default function Misiones() {
         })}
       </div>
 
-      {/* Panel de verificación (admin): cubre grupo + re-rolls de todos */}
-      {usuario.es_admin && grupoExiste && (
+      {/* Verificación (admin): agrupada por persona */}
+      {usuario.es_admin && misiones.length > 0 && (
         <div className="space-y-3 border-t border-white/10 pt-4">
           <h3 className="text-white font-bold">👑 Verificación</h3>
-          {misiones.map((m) => {
-            const comps = completadas.filter((c) => c.mision_id === m.id)
-            const dueno = m.propietario_id
-              ? usuarios.find((u) => u.id === m.propietario_id)
-              : null
+          {usuarios.map((u) => {
+            const sus = misiones.filter((m) => m.propietario_id === u.id)
+            if (sus.length === 0) return null
             return (
-              <div key={m.id} className="rounded-xl bg-white/5 p-3">
-                <div className="flex items-start gap-2">
-                  <Badge dificil={m.dificultad === 'dificil'} />
-                  <p className="text-white text-sm flex-1">{m.titulo}</p>
+              <div key={u.id} className="rounded-xl bg-white/5 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Avatar nombre={u.nombre} url={u.avatar_url} size={28} />
+                  <span className="text-white font-semibold">{u.nombre}</span>
                 </div>
-                {dueno && (
-                  <p className="text-sky-300 text-xs mt-1">🔁 re-roll de {dueno.nombre}</p>
-                )}
-                {comps.length === 0 ? (
-                  <p className="text-white/30 text-xs mt-2">Nadie la ha marcado aún.</p>
-                ) : (
-                  <div className="mt-2 space-y-1.5">
-                    {comps.map((c) => (
-                      <div key={c.id} className="flex items-center gap-2">
-                        <Avatar nombre={c.usuario?.nombre} url={c.usuario?.avatar_url} size={24} />
-                        <span className="text-white text-sm flex-1 truncate">
-                          {c.usuario?.nombre}
-                        </span>
-                        <EstadoMini estado={c.estado} />
-                        <button
-                          onClick={() => verificar(c, 'verificado')}
-                          className="rounded bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs px-2 py-1"
-                        >
-                          ✓
-                        </button>
-                        <button
-                          onClick={() => verificar(c, 'rechazado')}
-                          className="rounded bg-rose-700/80 hover:bg-rose-600 text-white text-xs px-2 py-1"
-                        >
-                          ✗
-                        </button>
+                <div className="space-y-2">
+                  {sus.map((m) => {
+                    const comp = completadas.find((c) => c.mision_id === m.id)
+                    return (
+                      <div key={m.id} className="flex items-start gap-2">
+                        <Badge dificil={m.dificultad === 'dificil'} />
+                        <p className="text-white/90 text-xs flex-1">{m.titulo}</p>
+                        {comp ? (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <EstadoMini estado={comp.estado} />
+                            <button
+                              onClick={() => verificar(comp, 'verificado')}
+                              className="rounded bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs px-2 py-1"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => verificar(comp, 'rechazado')}
+                              className="rounded bg-rose-700/80 hover:bg-rose-600 text-white text-xs px-2 py-1"
+                            >
+                              ✗
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-white/30 text-xs shrink-0">sin marcar</span>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    )
+                  })}
+                </div>
               </div>
             )
           })}
@@ -270,7 +270,7 @@ export default function Misiones() {
 function Badge({ dificil }) {
   return (
     <span
-      className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+      className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
         dificil ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
       }`}
     >
