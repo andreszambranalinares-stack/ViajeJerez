@@ -3,7 +3,7 @@
 export const TIPOS = [
   { id: 'cubata',  label: 'Cubata',  emoji: '🥃', color: 'from-amber-500 to-orange-600' },
   { id: 'cerveza', label: 'Cerveza', emoji: '🍺', color: 'from-yellow-400 to-amber-500' },
-  { id: 'fino',    label: 'Fino',    emoji: '🍷', color: 'from-rose-400 to-rose-600' },
+  { id: 'vino',    label: 'Vino',    emoji: '🍷', color: 'from-rose-400 to-rose-600' },
   { id: 'chupito', label: 'Chupito', emoji: '🥂', color: 'from-fuchsia-500 to-purple-600' },
   { id: 'cigarro', label: 'Cigarro', emoji: '🚬', color: 'from-slate-400 to-slate-600' },
   { id: 'agua',    label: 'Agua',    emoji: '💧', color: 'from-sky-400 to-blue-600' },
