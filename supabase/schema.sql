@@ -37,14 +37,18 @@ create table if not exists public.consumiciones (
 create index if not exists consumiciones_usuario_idx on public.consumiciones(usuario_id);
 create index if not exists consumiciones_tipo_idx     on public.consumiciones(tipo);
 
--- ---------- Galería de fotos (las mejores... y las peores) ----------
+-- ---------- Álbum: fotos y vídeos cortos (las mejores... y las peores) ----------
 create table if not exists public.fotos (
   id          uuid primary key default gen_random_uuid(),
   usuario_id  uuid references public.usuarios(id) on delete set null,
   url         text not null,
   caption     text,
+  tipo        text not null default 'foto' check (tipo in ('foto','video')),
   created_at  timestamptz not null default now()
 );
+
+-- Si ya tenías la tabla creada de antes, añadimos la columna del tipo:
+alter table public.fotos add column if not exists tipo text not null default 'foto';
 
 create index if not exists fotos_created_idx on public.fotos(created_at desc);
 

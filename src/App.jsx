@@ -16,7 +16,7 @@ const TABS = [
   { id: 'misiones', label: 'Misiones', emoji: '🎯' },
   { id: 'resumen', label: 'Resumen', emoji: '📊' },
   { id: 'ranking', label: 'Ranking', emoji: '🏆' },
-  { id: 'fotos', label: 'Fotos', emoji: '📸' },
+  { id: 'fotos', label: 'Álbum', emoji: '📸' },
 ]
 
 function Avisos() {

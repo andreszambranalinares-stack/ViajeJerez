@@ -4,6 +4,8 @@ import { useUsuario } from '../context/UsuarioContext'
 import { EMOJIS_REACCION } from '../lib/reacciones'
 import Avatar from './Avatar'
 
+const MAX_SEG_VIDEO = 16 // toleramos 1s de margen sobre los 15
+
 function formatFecha(iso) {
   const d = new Date(iso)
   return d.toLocaleString('es-ES', {
@@ -11,6 +13,20 @@ function formatFecha(iso) {
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
+  })
+}
+
+// Lee la duración de un vídeo (en segundos) antes de subirlo.
+function duracionVideo(file) {
+  return new Promise((resolve, reject) => {
+    const v = document.createElement('video')
+    v.preload = 'metadata'
+    v.onloadedmetadata = () => {
+      URL.revokeObjectURL(v.src)
+      resolve(v.duration)
+    }
+    v.onerror = () => reject(new Error('No se pudo leer el vídeo'))
+    v.src = URL.createObjectURL(file)
   })
 }
 
@@ -80,12 +96,20 @@ export default function Galeria() {
     }
   }
 
-  const elegir = (e) => {
+  const elegir = async (e) => {
     const file = e.target.files?.[0]
-    if (!file) return
-    setCaption('')
-    setPendiente({ file, preview: URL.createObjectURL(file) })
     if (inputFoto.current) inputFoto.current.value = ''
+    if (!file) return
+    const esVideo = file.type.startsWith('video')
+    if (esVideo) {
+      const dur = await duracionVideo(file).catch(() => null)
+      if (dur != null && dur > MAX_SEG_VIDEO) {
+        alert(`El vídeo dura ${Math.round(dur)}s. El máximo son 15 segundos 🙏`)
+        return
+      }
+    }
+    setCaption('')
+    setPendiente({ file, preview: URL.createObjectURL(file), esVideo })
   }
 
   const publicar = async () => {
@@ -94,21 +118,24 @@ export default function Galeria() {
     try {
       const ext = pendiente.file.name.split('.').pop()
       const ruta = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      const { error: upErr } = await supabase.storage.from('fotos').upload(ruta, pendiente.file)
+      const { error: upErr } = await supabase.storage
+        .from('fotos')
+        .upload(ruta, pendiente.file, { contentType: pendiente.file.type || undefined })
       if (upErr) throw upErr
       const url = supabase.storage.from('fotos').getPublicUrl(ruta).data.publicUrl
       await supabase.from('fotos').insert({
         usuario_id: usuario.id,
         url,
         caption: caption.trim() || null,
+        tipo: pendiente.esVideo ? 'video' : 'foto',
       })
       setPendiente(null)
       setCaption('')
     } catch (err) {
       console.error(err)
       alert(
-        'No se pudo subir la foto.\n\nLo más probable: el bucket "fotos" no existe o no es público.\n' +
-          'En Supabase → Storage, créalo como PÚBLICO y vuelve a ejecutar las políticas del schema.sql.',
+        'No se pudo subir.\n\nLo más probable: el bucket "fotos" no existe o no es público,\n' +
+          'o el archivo supera el límite de tamaño del bucket en Supabase (Storage → Settings).',
       )
     } finally {
       setSubiendo(false)
@@ -116,7 +143,7 @@ export default function Galeria() {
   }
 
   const borrar = async (foto) => {
-    if (!window.confirm('¿Borrar esta foto?')) return
+    if (!window.confirm('¿Borrar esto del álbum?')) return
     await supabase.from('fotos').delete().eq('id', foto.id)
   }
 
@@ -127,24 +154,46 @@ export default function Galeria() {
         disabled={subiendo}
         className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold py-3 transition"
       >
-        📸 Subir una foto
+        📸 Subir foto o vídeo
       </button>
-      <input ref={inputFoto} type="file" accept="image/*" className="hidden" onChange={elegir} />
+      <input
+        ref={inputFoto}
+        type="file"
+        accept="image/*,video/*"
+        className="hidden"
+        onChange={elegir}
+      />
+      <p className="text-white/30 text-xs text-center -mt-2">Vídeos de máximo 15 segundos 🎬</p>
 
       {fotos.length === 0 ? (
         <p className="text-white/40 text-center py-8">
-          Todavía no hay fotos. ¡Sube la primera (cuanto más horrible, mejor)!
+          El álbum está vacío. ¡Sube la primera foto o vídeo (cuanto más horrible, mejor)!
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           {fotos.map((f) => (
             <div key={f.id} className="relative group">
-              <img
-                src={f.url}
-                alt={f.caption || ''}
-                onClick={() => setAmpliada(f)}
-                className="w-full aspect-square object-cover rounded-xl cursor-pointer"
-              />
+              {f.tipo === 'video' ? (
+                <div onClick={() => setAmpliada(f)} className="relative cursor-pointer">
+                  <video
+                    src={f.url}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="w-full aspect-square object-cover rounded-xl"
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center text-4xl drop-shadow-lg pointer-events-none">
+                    ▶️
+                  </span>
+                </div>
+              ) : (
+                <img
+                  src={f.url}
+                  alt={f.caption || ''}
+                  onClick={() => setAmpliada(f)}
+                  className="w-full aspect-square object-cover rounded-xl cursor-pointer"
+                />
+              )}
               <div className="absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-black/80 to-transparent rounded-b-xl">
                 <div className="flex items-center gap-1">
                   <Avatar nombre={f.autor?.nombre} url={f.autor?.avatar_url} size={20} />
@@ -182,7 +231,16 @@ export default function Galeria() {
             className="w-full sm:max-w-sm bg-neutral-900 rounded-t-3xl sm:rounded-3xl p-5 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <img src={pendiente.preview} alt="" className="w-full max-h-72 object-contain rounded-xl" />
+            {pendiente.esVideo ? (
+              <video
+                src={pendiente.preview}
+                controls
+                playsInline
+                className="w-full max-h-72 rounded-xl bg-black"
+              />
+            ) : (
+              <img src={pendiente.preview} alt="" className="w-full max-h-72 object-contain rounded-xl" />
+            )}
             <textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
@@ -218,7 +276,18 @@ export default function Galeria() {
           className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4"
           onClick={() => setAmpliada(null)}
         >
-          <img src={ampliada.url} alt="" className="max-h-[65vh] max-w-full rounded-xl" />
+          {ampliada.tipo === 'video' ? (
+            <video
+              src={ampliada.url}
+              controls
+              autoPlay
+              playsInline
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[65vh] max-w-full rounded-xl bg-black"
+            />
+          ) : (
+            <img src={ampliada.url} alt="" className="max-h-[65vh] max-w-full rounded-xl" />
+          )}
           {ampliada.caption && <p className="text-white mt-3 text-center px-4">{ampliada.caption}</p>}
           <p className="text-white/50 text-sm mt-1">
             {ampliada.autor?.nombre} · {formatFecha(ampliada.created_at)}
