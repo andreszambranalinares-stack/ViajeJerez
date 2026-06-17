@@ -6,12 +6,14 @@ import Contador from './components/Contador'
 import Ranking from './components/Ranking'
 import Misiones from './components/Misiones'
 import Galeria from './components/Galeria'
+import Resumen from './components/Resumen'
 import Ajustes from './components/Ajustes'
 import Avatar from './components/Avatar'
 
 const TABS = [
   { id: 'contador', label: 'Contador', emoji: '🍻' },
   { id: 'misiones', label: 'Misiones', emoji: '🎯' },
+  { id: 'resumen', label: 'Resumen', emoji: '📊' },
   { id: 'ranking', label: 'Ranking', emoji: '🏆' },
   { id: 'fotos', label: 'Fotos', emoji: '📸' },
 ]
@@ -64,18 +66,19 @@ function AppInterna() {
       <main className="flex-1 max-w-md w-full mx-auto px-4 py-5 pb-24">
         {tab === 'contador' && <Contador />}
         {tab === 'misiones' && <Misiones />}
+        {tab === 'resumen' && <Resumen />}
         {tab === 'ranking' && <Ranking />}
         {tab === 'fotos' && <Galeria />}
       </main>
 
       {/* Barra de navegación inferior */}
       <nav className="fixed bottom-0 inset-x-0 z-30 bg-neutral-900/95 backdrop-blur border-t border-white/10">
-        <div className="max-w-md mx-auto grid grid-cols-4">
+        <div className="max-w-md mx-auto grid grid-cols-5">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`py-2.5 flex flex-col items-center gap-0.5 text-xs transition ${
+              className={`py-2.5 flex flex-col items-center gap-0.5 text-[11px] transition ${
                 tab === t.id ? 'text-amber-400' : 'text-white/50'
               }`}
             >

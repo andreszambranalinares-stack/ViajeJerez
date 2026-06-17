@@ -56,6 +56,9 @@ export const DIFICILES = [
   'Consigue que un/a desconocido/a se aprenda el nombre de {X}',
   'Convence a un camarero de que te invite a algo',
   'Organiza que todo el grupo cambie de bar en menos de 10 minutos',
+  'Échate un pulso contra {X} y gánale',
+  'Desafía a {X} a un duelo (dardos, futbolín, lo que sea) y gánale',
+  'Reta a {X} a aguantar más sin beber agua y gánale',
 ]
 
 // Misiones de dificultad media (2 puntos). El admin las puede usar al añadir
@@ -69,6 +72,7 @@ export const MEDIAS = [
   'Consigue un piropo de un camarero/a',
   'Que {X} se aprenda y diga un trabalenguas sin fallar',
   'Intercambia una prenda con {X} durante 10 minutos',
+  'Gana a {X} a piedra-papel-tijera al mejor de 5',
 ]
 
 function rellena(plantilla, objetivoNombre) {

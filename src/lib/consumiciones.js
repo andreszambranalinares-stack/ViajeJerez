@@ -7,6 +7,7 @@ export const TIPOS = [
   { id: 'chupito', label: 'Chupito', emoji: '🥂', color: 'from-fuchsia-500 to-purple-600' },
   { id: 'cigarro', label: 'Cigarro', emoji: '🚬', color: 'from-slate-400 to-slate-600' },
   { id: 'agua',    label: 'Agua',    emoji: '💧', color: 'from-sky-400 to-blue-600' },
+  { id: 'potada',  label: 'Potada',  emoji: '🤮', color: 'from-lime-500 to-green-700' },
 ]
 
 export const TIPOS_POR_ID = Object.fromEntries(TIPOS.map((t) => [t.id, t]))

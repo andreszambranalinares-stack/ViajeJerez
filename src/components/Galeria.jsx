@@ -113,10 +113,11 @@ export default function Galeria() {
                 {f.caption && <p className="text-white/90 text-xs truncate mt-0.5">{f.caption}</p>}
                 <p className="text-white/50 text-[10px] mt-0.5">{formatFecha(f.created_at)}</p>
               </div>
-              {f.usuario_id === usuario.id && (
+              {(f.usuario_id === usuario.id || usuario.es_admin) && (
                 <button
                   onClick={() => borrar(f)}
-                  className="absolute top-1 right-1 bg-black/50 text-white text-xs rounded-full w-6 h-6 opacity-0 group-hover:opacity-100 transition"
+                  className="absolute top-1 right-1 bg-black/50 text-white text-xs rounded-full w-6 h-6 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition"
+                  title={f.usuario_id === usuario.id ? 'Borrar tu foto' : 'Borrar (admin)'}
                 >
                   ✕
                 </button>
