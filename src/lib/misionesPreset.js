@@ -109,3 +109,14 @@ export function generarMisionesDelDia(usuarios = []) {
   const dificil = aleatorio(DIFICILES, 1).map((p) => conObjetivo(p, 'dificil', 3))
   return [...faciles, ...dificil]
 }
+
+// Genera UNA misión difícil al azar (para el re-roll personal de cada uno).
+export function generarUnaDificil(usuarios = []) {
+  const plantilla = aleatorio(DIFICILES, 1)[0]
+  let objetivo = null
+  if (plantilla.includes('{X}') && usuarios.length) {
+    objetivo = usuarios[Math.floor(Math.random() * usuarios.length)]
+  }
+  const titulo = rellena(plantilla, objetivo?.nombre)
+  return { titulo, dificultad: 'dificil', puntos: 3, objetivo_id: objetivo?.id ?? null }
+}

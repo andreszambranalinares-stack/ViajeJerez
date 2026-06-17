@@ -57,8 +57,12 @@ create table if not exists public.misiones (
   dificultad   text not null default 'facil' check (dificultad in ('facil','dificil')),
   puntos       int  not null default 1,
   objetivo_id  uuid references public.usuarios(id) on delete set null, -- "robarle una prenda a X"
+  propietario_id uuid references public.usuarios(id) on delete cascade, -- si está, es una misión personal (re-roll)
   created_at   timestamptz not null default now()
 );
+
+-- Si ya tenías la tabla creada de antes, añadimos la columna del re-roll:
+alter table public.misiones add column if not exists propietario_id uuid references public.usuarios(id) on delete cascade;
 
 create index if not exists misiones_fecha_idx on public.misiones(fecha desc);
 
