@@ -36,6 +36,7 @@ export default function Galeria() {
   const [reacciones, setReacciones] = useState([]) // todas las reacciones
   const [subiendo, setSubiendo] = useState(false)
   const [ampliada, setAmpliada] = useState(null)
+  const [aviso, setAviso] = useState('')
   // Foto elegida y a la espera de añadirle texto antes de publicar.
   const [pendiente, setPendiente] = useState(null) // { file, preview }
   const [caption, setCaption] = useState('')
@@ -104,10 +105,11 @@ export default function Galeria() {
     if (esVideo) {
       const dur = await duracionVideo(file).catch(() => null)
       if (dur != null && dur > MAX_SEG_VIDEO) {
-        alert(`El vídeo dura ${Math.round(dur)}s. El máximo son 15 segundos 🙏`)
+        setAviso(`⛔ El vídeo dura ${Math.round(dur)}s. El máximo son 15 segundos.`)
         return
       }
     }
+    setAviso('')
     setCaption('')
     setPendiente({ file, preview: URL.createObjectURL(file), esVideo })
   }
@@ -133,18 +135,12 @@ export default function Galeria() {
       setCaption('')
     } catch (err) {
       console.error(err)
-      alert(
-        'No se pudo subir.\n\nLo más probable: el bucket "fotos" no existe o no es público,\n' +
-          'o el archivo supera el límite de tamaño del bucket en Supabase (Storage → Settings).',
+      setAviso(
+        '⛔ No se pudo subir. Puede que el archivo supere el límite de tamaño del bucket en Supabase.',
       )
     } finally {
       setSubiendo(false)
     }
-  }
-
-  const borrar = async (foto) => {
-    if (!window.confirm('¿Borrar esto del álbum?')) return
-    await supabase.from('fotos').delete().eq('id', foto.id)
   }
 
   return (
@@ -164,6 +160,13 @@ export default function Galeria() {
         onChange={elegir}
       />
       <p className="text-white/30 text-xs text-center -mt-2">Vídeos de máximo 15 segundos 🎬</p>
+
+      {aviso && (
+        <div className="rounded-xl bg-rose-600/90 text-white text-sm px-4 py-2 flex items-start justify-between gap-3">
+          <span>{aviso}</span>
+          <button onClick={() => setAviso('')} className="font-bold shrink-0">✕</button>
+        </div>
+      )}
 
       {fotos.length === 0 ? (
         <p className="text-white/40 text-center py-8">
@@ -206,15 +209,6 @@ export default function Galeria() {
                 <span className="absolute top-1 left-1 bg-black/50 text-white text-xs rounded-full px-2 py-0.5">
                   ❤️ {totalReacciones(f.id)}
                 </span>
-              )}
-              {(f.usuario_id === usuario.id || usuario.es_admin) && (
-                <button
-                  onClick={() => borrar(f)}
-                  className="absolute top-1 right-1 bg-black/50 text-white text-xs rounded-full w-6 h-6 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition"
-                  title={f.usuario_id === usuario.id ? 'Borrar tu foto' : 'Borrar (admin)'}
-                >
-                  ✕
-                </button>
               )}
             </div>
           ))}
@@ -314,6 +308,22 @@ export default function Galeria() {
               )
             })}
           </div>
+
+          {/* Borrar (dueño o admin) */}
+          {(ampliada.usuario_id === usuario.id || usuario.es_admin) && (
+            <button
+              onClick={async (e) => {
+                e.stopPropagation()
+                const borrada = ampliada
+                if (!window.confirm('¿Borrar esto del álbum?')) return
+                setAmpliada(null)
+                await supabase.from('fotos').delete().eq('id', borrada.id)
+              }}
+              className="mt-5 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white font-semibold px-5 py-2.5"
+            >
+              🗑️ Borrar {ampliada.usuario_id === usuario.id ? '' : '(admin)'}
+            </button>
+          )}
         </div>
       )}
     </div>
