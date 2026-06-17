@@ -145,13 +145,26 @@ create policy "acceso_libre_viaje" on public.viaje
 -- ============================================================
 --  Realtime: que se actualice en vivo en el móvil de todos
 -- ============================================================
-alter publication supabase_realtime add table public.usuarios;
-alter publication supabase_realtime add table public.consumiciones;
-alter publication supabase_realtime add table public.fotos;
-alter publication supabase_realtime add table public.misiones;
-alter publication supabase_realtime add table public.misiones_completadas;
-alter publication supabase_realtime add table public.reacciones;
-alter publication supabase_realtime add table public.viaje;
+-- Añadimos cada tabla a la publicación SOLO si no estaba ya (idempotente).
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'usuarios', 'consumiciones', 'fotos', 'misiones',
+    'misiones_completadas', 'reacciones', 'viaje'
+  ]
+  loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
 
 -- ============================================================
 --  Políticas de Storage (para subir avatares y fotos desde anon)
