@@ -108,10 +108,25 @@ export default function Ajustes({ onClose }) {
       alert('No puedes borrarte a ti mismo desde aquí. Usa "Cerrar sesión".')
       return
     }
-    if (!window.confirm(`¿Borrar a "${p.nombre}"? Se eliminan sus consumiciones y misiones. (Las fotos se mantienen)`)) {
+    if (!window.confirm(`¿Borrar a "${p.nombre}"? Se eliminan sus consumiciones y misiones.`)) {
       return
     }
-    await supabase.from('usuarios').delete().eq('id', p.id)
+    // Limpiamos primero todo lo que cuelga de esa persona (por si algún
+    // FK no tiene cascade en tu base de datos) y luego borramos al usuario.
+    await supabase.from('reacciones').delete().eq('usuario_id', p.id)
+    await supabase.from('misiones_completadas').delete().eq('usuario_id', p.id)
+    await supabase.from('misiones_completadas').update({ verificado_por: null }).eq('verificado_por', p.id)
+    await supabase.from('consumiciones').delete().eq('usuario_id', p.id)
+    await supabase.from('misiones').delete().eq('propietario_id', p.id)
+    await supabase.from('misiones').update({ objetivo_id: null }).eq('objetivo_id', p.id)
+    await supabase.from('fotos').update({ usuario_id: null }).eq('usuario_id', p.id)
+
+    const { error } = await supabase.from('usuarios').delete().eq('id', p.id)
+    if (error) {
+      console.error(error)
+      alert('No se pudo borrar: ' + error.message)
+      return
+    }
     cargarPersonas()
   }
 
