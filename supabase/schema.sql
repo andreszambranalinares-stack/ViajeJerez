@@ -107,6 +107,27 @@ create table if not exists public.viaje (
 
 insert into public.viaje (id, cerrado) values (1, false) on conflict (id) do nothing;
 
+-- ---------- Predicciones del día ("¿quién es más probable que...?") ----------
+create table if not exists public.predicciones (
+  id          uuid primary key default gen_random_uuid(),
+  fecha       date not null default current_date,
+  autor_id    uuid references public.usuarios(id) on delete set null,   -- quién la propuso
+  sujeto_id   uuid not null references public.usuarios(id) on delete cascade, -- de quién va
+  texto       text not null,   -- "se va a poner borracho hoy"
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists predicciones_fecha_idx on public.predicciones(fecha desc);
+
+create table if not exists public.predicciones_votos (
+  id            uuid primary key default gen_random_uuid(),
+  prediccion_id uuid not null references public.predicciones(id) on delete cascade,
+  usuario_id    uuid not null references public.usuarios(id) on delete cascade,
+  cumplio       boolean not null,   -- true = se cumplió, false = no
+  created_at    timestamptz not null default now(),
+  unique (prediccion_id, usuario_id)
+);
+
 -- ============================================================
 --  Row Level Security: abierto al rol anónimo (app privada)
 -- ============================================================
@@ -117,6 +138,8 @@ alter table public.misiones             enable row level security;
 alter table public.misiones_completadas enable row level security;
 alter table public.reacciones           enable row level security;
 alter table public.viaje                enable row level security;
+alter table public.predicciones         enable row level security;
+alter table public.predicciones_votos   enable row level security;
 
 -- Borramos políticas previas si re-ejecutas el script
 drop policy if exists "acceso_libre_usuarios"      on public.usuarios;
@@ -148,6 +171,14 @@ create policy "acceso_libre_reacciones" on public.reacciones
 create policy "acceso_libre_viaje" on public.viaje
   for all to anon, authenticated using (true) with check (true);
 
+drop policy if exists "acceso_libre_predicciones"       on public.predicciones;
+drop policy if exists "acceso_libre_predicciones_votos" on public.predicciones_votos;
+
+create policy "acceso_libre_predicciones" on public.predicciones
+  for all to anon, authenticated using (true) with check (true);
+create policy "acceso_libre_predicciones_votos" on public.predicciones_votos
+  for all to anon, authenticated using (true) with check (true);
+
 -- ============================================================
 --  Realtime: que se actualice en vivo en el móvil de todos
 -- ============================================================
@@ -158,7 +189,8 @@ declare
 begin
   foreach t in array array[
     'usuarios', 'consumiciones', 'fotos', 'misiones',
-    'misiones_completadas', 'reacciones', 'viaje'
+    'misiones_completadas', 'reacciones', 'viaje',
+    'predicciones', 'predicciones_votos'
   ]
   loop
     if not exists (
