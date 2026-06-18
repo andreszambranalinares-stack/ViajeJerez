@@ -8,6 +8,7 @@ import Misiones from './components/Misiones'
 import Galeria from './components/Galeria'
 import Resumen from './components/Resumen'
 import Predicciones from './components/Predicciones'
+import Ruleta from './components/Ruleta'
 import Wrapped from './components/Wrapped'
 import Ajustes from './components/Ajustes'
 import Avatar from './components/Avatar'
@@ -17,8 +18,8 @@ const TABS = [
   { id: 'contador', label: 'Contador', emoji: '🍻' },
   { id: 'misiones', label: 'Misiones', emoji: '🎯' },
   { id: 'predis', label: 'Predis', emoji: '🔮' },
+  { id: 'ruleta', label: 'Ruleta', emoji: '🎰' },
   { id: 'resumen', label: 'Resumen', emoji: '📊' },
-  { id: 'ranking', label: 'Ranking', emoji: '🏆' },
   { id: 'fotos', label: 'Álbum', emoji: '📸' },
 ]
 
@@ -115,8 +116,13 @@ function AppInterna() {
         {tab === 'contador' && <Contador />}
         {tab === 'misiones' && <Misiones />}
         {tab === 'predis' && <Predicciones />}
-        {tab === 'resumen' && <Resumen />}
-        {tab === 'ranking' && <Ranking />}
+        {tab === 'ruleta' && <Ruleta />}
+        {tab === 'resumen' && (
+          <div className="space-y-10">
+            <Resumen />
+            <Ranking />
+          </div>
+        )}
         {tab === 'fotos' && <Galeria />}
       </main>
 

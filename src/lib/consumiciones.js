@@ -6,6 +6,8 @@ export const TIPOS = [
   { id: 'vino',    label: 'Vino',    emoji: '🍷', color: 'from-rose-400 to-rose-600' },
   { id: 'chupito', label: 'Chupito', emoji: '🥂', color: 'from-fuchsia-500 to-purple-600' },
   { id: 'cigarro', label: 'Cigarro', emoji: '🚬', color: 'from-slate-400 to-slate-600' },
+  { id: 'porro',   label: 'Porro',   emoji: '🌿', color: 'from-green-500 to-emerald-700' },
+  { id: 'vapeo',   label: 'Vapear',  emoji: '💨', color: 'from-cyan-400 to-teal-600' },
   { id: 'potada',  label: 'Potada',  emoji: '🤮', color: 'from-lime-500 to-green-700' },
 ]
 

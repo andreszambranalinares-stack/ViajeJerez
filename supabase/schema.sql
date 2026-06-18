@@ -128,6 +128,21 @@ create table if not exists public.predicciones_votos (
   unique (prediccion_id, usuario_id)
 );
 
+-- ---------- Ruleta: apuestas con las fichas del día (1 consumición = 1 ficha) ----------
+create table if not exists public.ruleta_jugadas (
+  id          uuid primary key default gen_random_uuid(),
+  usuario_id  uuid not null references public.usuarios(id) on delete cascade,
+  fecha       date not null default current_date,
+  apuesta     int not null,
+  color       text not null check (color in ('rojo','negro','verde')),
+  resultado   int not null,        -- número que ha salido (0..36)
+  gano        boolean not null,
+  ganancia    int not null,        -- neto: positivo si gana, negativo si pierde
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists ruleta_fecha_usuario_idx on public.ruleta_jugadas(fecha, usuario_id);
+
 -- ============================================================
 --  Row Level Security: abierto al rol anónimo (app privada)
 -- ============================================================
@@ -140,6 +155,7 @@ alter table public.reacciones           enable row level security;
 alter table public.viaje                enable row level security;
 alter table public.predicciones         enable row level security;
 alter table public.predicciones_votos   enable row level security;
+alter table public.ruleta_jugadas       enable row level security;
 
 -- Borramos políticas previas si re-ejecutas el script
 drop policy if exists "acceso_libre_usuarios"      on public.usuarios;
@@ -179,6 +195,10 @@ create policy "acceso_libre_predicciones" on public.predicciones
 create policy "acceso_libre_predicciones_votos" on public.predicciones_votos
   for all to anon, authenticated using (true) with check (true);
 
+drop policy if exists "acceso_libre_ruleta" on public.ruleta_jugadas;
+create policy "acceso_libre_ruleta" on public.ruleta_jugadas
+  for all to anon, authenticated using (true) with check (true);
+
 -- ============================================================
 --  Realtime: que se actualice en vivo en el móvil de todos
 -- ============================================================
@@ -190,7 +210,7 @@ begin
   foreach t in array array[
     'usuarios', 'consumiciones', 'fotos', 'misiones',
     'misiones_completadas', 'reacciones', 'viaje',
-    'predicciones', 'predicciones_votos'
+    'predicciones', 'predicciones_votos', 'ruleta_jugadas'
   ]
   loop
     if not exists (
