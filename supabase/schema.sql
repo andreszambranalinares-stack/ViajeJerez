@@ -134,12 +134,15 @@ create table if not exists public.ruleta_jugadas (
   usuario_id  uuid not null references public.usuarios(id) on delete cascade,
   fecha       date not null default current_date,
   apuesta     int not null,
-  color       text not null check (color in ('rojo','negro','verde')),
+  color       text not null,       -- token de la apuesta: rojo, negro, par, impar, bajo, alto, docena1..3, num:N
   resultado   int not null,        -- número que ha salido (0..36)
   gano        boolean not null,
   ganancia    int not null,        -- neto: positivo si gana, negativo si pierde
   created_at  timestamptz not null default now()
 );
+
+-- Si ya tenías la tabla con el check antiguo (solo rojo/negro/verde), lo quitamos:
+alter table public.ruleta_jugadas drop constraint if exists ruleta_jugadas_color_check;
 
 create index if not exists ruleta_fecha_usuario_idx on public.ruleta_jugadas(fecha, usuario_id);
 
