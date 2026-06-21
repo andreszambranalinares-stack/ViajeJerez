@@ -128,6 +128,18 @@ export function generarMisionesParaTodos(destinatarios = [], todos = []) {
   return out
 }
 
+// Genera las 3 misiones anónimas del día (2 fáciles + 1 difícil) sin propietario.
+// Se insertan una vez en Supabase y las ve todo el grupo.
+export function generarPresetsDiarios(fecha) {
+  const faciles = aleatorio(FACILES, 2)
+  const dificil = aleatorio(DIFICILES, 1)[0]
+  return [
+    { fecha, titulo: rellena(faciles[0], null), dificultad: 'facil', puntos: 1 },
+    { fecha, titulo: rellena(faciles[1], null), dificultad: 'facil', puntos: 1 },
+    { fecha, titulo: rellena(dificil, null), dificultad: 'dificil', puntos: 3 },
+  ]
+}
+
 // Genera UNA misión difícil al azar (para el re-roll personal de cada uno).
 export function generarUnaDificil(dueño, todos = []) {
   const plantilla = aleatorio(DIFICILES, 1)[0]

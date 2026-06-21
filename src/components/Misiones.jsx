@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useUsuario } from '../context/UsuarioContext'
-import { repartirSinRepetir } from '../lib/misionesPreset'
+import { repartirSinRepetir, generarPresetsDiarios } from '../lib/misionesPreset'
 import Avatar from './Avatar'
 
 const hoy = () => new Date().toLocaleDateString('sv') // YYYY-MM-DD local
@@ -9,7 +9,7 @@ const PUNTOS_MISION = 3
 
 export default function Misiones() {
   const { usuario } = useUsuario()
-  const [misiones, setMisiones] = useState([]) // todas las de hoy
+  const [misiones, setMisiones] = useState([])
   const [completadas, setCompletadas] = useState([])
   const [usuarios, setUsuarios] = useState([])
   const [trabajando, setTrabajando] = useState(false)
@@ -22,10 +22,23 @@ export default function Misiones() {
       supabase.from('misiones').select('*').eq('fecha', fecha).order('created_at'),
       supabase.from('usuarios').select('id, nombre, avatar_url'),
     ])
-    setMisiones(m.data ?? [])
+
+    let todas = m.data ?? []
     setUsuarios(u.data ?? [])
 
-    const ids = (m.data ?? []).map((x) => x.id)
+    // Si no hay misiones anónimas (preset) hoy, las generamos e insertamos
+    const presetsExistentes = todas.filter((x) => x.autor_id === null)
+    if (presetsExistentes.length === 0) {
+      const nuevas = generarPresetsDiarios(fecha)
+      const { data: insertadas } = await supabase.from('misiones').insert(nuevas).select()
+      if (insertadas?.length) {
+        todas = [...todas, ...insertadas]
+      }
+    }
+
+    setMisiones(todas)
+
+    const ids = todas.map((x) => x.id)
     if (ids.length) {
       const { data: c } = await supabase
         .from('misiones_completadas')
@@ -47,12 +60,15 @@ export default function Misiones() {
     return () => supabase.removeChannel(canal)
   }, [])
 
-  // ---------- Estado del día ----------
-  // Ya repartido en cuanto alguna misión de hoy tiene destinatario.
-  const yaRepartido = misiones.some((m) => m.propietario_id != null)
-  const miEscrita = misiones.find((m) => m.autor_id === usuario.id)
-  const miMision = misiones.find((m) => m.propietario_id === usuario.id) // la que me tocó
-  const escritas = misiones.length
+  // Separamos las misiones anónimas del día de las escritas por el grupo
+  const presets = misiones.filter((m) => m.autor_id === null).slice(0, 3)
+  const misionesUsuario = misiones.filter((m) => m.autor_id !== null)
+
+  // ---------- Estado del día (amigo invisible) ----------
+  const yaRepartido = misionesUsuario.some((m) => m.propietario_id != null)
+  const miEscrita = misionesUsuario.find((m) => m.autor_id === usuario.id)
+  const miMision = misionesUsuario.find((m) => m.propietario_id === usuario.id)
+  const escritas = misionesUsuario.length
   const todasEscritas = usuarios.length >= 2 && escritas >= usuarios.length
 
   const miEstado = (misionId) =>
@@ -91,16 +107,16 @@ export default function Misiones() {
   const repartir = async () => {
     if (yaRepartido || !todasEscritas) return
     setTrabajando(true)
-    // Releemos por si justo entró otra para no repartir con datos viejos.
     const { data: actuales } = await supabase
       .from('misiones')
       .select('id, autor_id, propietario_id')
       .eq('fecha', hoy())
+      .not('autor_id', 'is', null) // solo las escritas por el grupo
       .order('created_at')
     const lista = actuales ?? []
     if (lista.some((m) => m.propietario_id != null)) {
       setTrabajando(false)
-      return // alguien ya repartió
+      return
     }
     const autores = lista.map((m) => m.autor_id)
     const destinos = repartirSinRepetir(autores)
@@ -159,7 +175,109 @@ export default function Misiones() {
         </p>
       </div>
 
-      {/* ---------- FASE 1: escribir ---------- */}
+      {/* ---------- Misiones anónimas del día (preset) ---------- */}
+      {presets.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-white/50 text-xs uppercase tracking-wide font-semibold px-1">
+            🎲 Retos del día · para todo el grupo
+          </p>
+          {presets.map((preset) => {
+            const comp = completadas.filter((c) => c.mision_id === preset.id)
+            const miComp = miEstado(preset.id)
+            const esDificil = preset.dificultad === 'dificil'
+            return (
+              <div key={preset.id} className="rounded-2xl bg-white/5 p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      esDificil
+                        ? 'bg-rose-500/20 text-rose-300'
+                        : 'bg-emerald-500/20 text-emerald-300'
+                    }`}
+                  >
+                    {esDificil ? 'DIFÍCIL' : 'FÁCIL'}
+                  </span>
+                  <span className="text-amber-400 font-bold text-sm">+{preset.puntos} pts</span>
+                </div>
+                <p className="text-white font-medium">{preset.titulo}</p>
+
+                {/* Quién la ha completado */}
+                {comp.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {comp.map((c) => (
+                      <div
+                        key={c.id}
+                        className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
+                          c.estado === 'verificado'
+                            ? 'bg-emerald-500/20 text-emerald-200'
+                            : c.estado === 'rechazado'
+                            ? 'bg-rose-500/20 text-rose-200'
+                            : 'bg-amber-500/20 text-amber-200'
+                        }`}
+                      >
+                        <Avatar nombre={c.usuario?.nombre} url={c.usuario?.avatar_url} size={14} />
+                        {c.usuario?.nombre}
+                        {c.estado === 'verificado' ? ' ✅' : c.estado === 'rechazado' ? ' ❌' : ' ⏳'}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => marcar(preset)}
+                  disabled={miComp?.estado === 'verificado' || miComp?.estado === 'rechazado'}
+                  className={`w-full rounded-lg py-2 font-semibold text-sm transition ${
+                    miComp?.estado === 'verificado'
+                      ? 'bg-emerald-600 text-white'
+                      : miComp?.estado === 'rechazado'
+                      ? 'bg-rose-900/50 text-rose-300'
+                      : miComp
+                      ? 'bg-amber-500/30 text-amber-200 ring-1 ring-amber-400/40'
+                      : 'bg-amber-500 hover:bg-amber-400 text-black'
+                  }`}
+                >
+                  {miComp?.estado === 'verificado'
+                    ? '✅ ¡Conseguida y verificada!'
+                    : miComp?.estado === 'rechazado'
+                    ? '❌ Rechazada por el admin'
+                    : miComp
+                    ? '⏳ Pendiente de verificar (toca para cancelar)'
+                    : '¡La he hecho!'}
+                </button>
+
+                {/* Verificación inline para admin */}
+                {usuario.es_admin && comp.length > 0 && (
+                  <div className="space-y-1 pt-1 border-t border-white/10">
+                    {comp
+                      .filter((c) => c.estado === 'pendiente')
+                      .map((c) => (
+                        <div key={c.id} className="flex items-center justify-between">
+                          <span className="text-white/60 text-xs">{c.usuario?.nombre}</span>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => verificar(c, 'verificado')}
+                              className="rounded bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs px-2 py-1"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => verificar(c, 'rechazado')}
+                              className="rounded bg-rose-700/80 hover:bg-rose-600 text-white text-xs px-2 py-1"
+                            >
+                              ✗
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ---------- FASE 1: escribir (amigo invisible) ---------- */}
       {!yaRepartido && (
         <div className="space-y-4">
           <div className="rounded-2xl bg-white/5 p-4 space-y-3">
@@ -229,7 +347,7 @@ export default function Misiones() {
             </p>
             <div className="flex flex-wrap gap-2">
               {usuarios.map((u) => {
-                const listo = misiones.some((m) => m.autor_id === u.id)
+                const listo = misionesUsuario.some((m) => m.autor_id === u.id)
                 return (
                   <div
                     key={u.id}
@@ -309,8 +427,8 @@ export default function Misiones() {
         </div>
       )}
 
-      {/* ---------- Admin: verificación + reset ---------- */}
-      {usuario.es_admin && misiones.length > 0 && (
+      {/* ---------- Admin: verificación misiones grupo + reset ---------- */}
+      {usuario.es_admin && misionesUsuario.length > 0 && (
         <div className="space-y-3 border-t border-white/10 pt-4">
           <div className="flex items-center justify-between">
             <h3 className="text-white font-bold">👑 Admin</h3>
@@ -325,7 +443,7 @@ export default function Misiones() {
 
           {yaRepartido &&
             usuarios.map((u) => {
-              const suya = misiones.find((m) => m.propietario_id === u.id)
+              const suya = misionesUsuario.find((m) => m.propietario_id === u.id)
               if (!suya) return null
               const comp = completadas.find((c) => c.mision_id === suya.id)
               const autor = usuarios.find((x) => x.id === suya.autor_id)
