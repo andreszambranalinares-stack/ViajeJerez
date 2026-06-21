@@ -78,6 +78,13 @@ export default function Ruleta() {
   const [targetNumber, setTargetNumber] = useState(null)
   const pendingResult = useRef(null)
 
+  // La mesa se diseña a 460px y se escala para caber entera en el ancho
+  // disponible (sin scroll horizontal en el móvil).
+  const tableOuterRef = useRef(null)
+  const tableInnerRef = useRef(null)
+  const [tableScale, setTableScale] = useState(1)
+  const [tableHeight, setTableHeight] = useState(undefined)
+
   const saldo = consumiciones + neto
   const total = useMemo(() => Object.values(bets).reduce((s, x) => s + x, 0), [bets])
   const winningNumber = result?.number ?? null
@@ -115,6 +122,21 @@ export default function Ruleta() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario.id])
+
+  useEffect(() => {
+    const outer = tableOuterRef.current
+    const inner = tableInnerRef.current
+    if (!outer || !inner) return
+    const update = () => {
+      const scale = Math.min(1, outer.clientWidth / 460)
+      setTableScale(scale)
+      setTableHeight(inner.offsetHeight * scale)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(outer)
+    return () => ro.disconnect()
+  }, [])
 
   function place(key) {
     if (spinning) return
@@ -213,8 +235,29 @@ export default function Ruleta() {
 
       {error && <p className="text-center text-sm text-rose-400">{error}</p>}
 
-      <div className="overflow-x-auto">
-        <div className="mx-auto min-w-[460px] max-w-xl space-y-1 rounded-xl bg-[#0e5a34] p-1.5">
+      {/* Números recientes (los últimos 10 que han salido) */}
+      {historial.length > 0 && (
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-white/50">Números recientes</div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {historial.slice(0, 10).map((j) => (
+              <span
+                key={j.id}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ring-1 ring-white/10 ${NUM_BG[colorOf(j.resultado)]}`}
+              >
+                {j.resultado}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div ref={tableOuterRef} className="w-full overflow-hidden" style={{ height: tableHeight }}>
+        <div
+          ref={tableInnerRef}
+          style={{ width: 460, transform: `scale(${tableScale})`, transformOrigin: 'top left' }}
+        >
+          <div className="space-y-1 rounded-xl bg-[#0e5a34] p-1.5">
           <div className="flex gap-px">
             <Cell {...cellProps} betKey="g:0" className={`w-8 shrink-0 self-stretch ${NUM_BG.green}`}>0</Cell>
 
@@ -257,6 +300,7 @@ export default function Ruleta() {
               <Cell {...cellProps} betKey="high" className="h-9 bg-[#0b7a43] text-[10px]">19-36</Cell>
             </div>
             <div className="w-11 shrink-0" aria-hidden />
+          </div>
           </div>
         </div>
       </div>
