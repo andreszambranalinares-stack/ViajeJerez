@@ -12,11 +12,15 @@ Pensada para el móvil. Sin contraseñas: entras solo con tu nombre (y una foto 
   nadie recibe la suya y cada uno recibe una. Son de broma y piques sanos.
   El **administrador** verifica si se han conseguido (o las rechaza).
 - **🤳 ¿Quién soy?** — el clásico de ponerse el móvil en la frente: te sale un
-  personaje, los demás te dan pistas y **tú adivinas quién eres**. Base de datos
-  de futbolistas, streamers/influencers (España y Latinoamérica), deportistas
-  españoles de élite, música, cine y ficción. De vez en cuando (poco probable)
-  se cuela alguien del propio grupo… ¡hasta tú mismo! Se juega con botones o con
-  el sensor de inclinación. La lista está en `src/lib/personajes.js`.
+  personaje, los demás te dan pistas y **tú adivinas quién eres**. Dos modos:
+  **⚡ Contrarreloj** (cartas que van cambiando hasta que se acaba el tiempo) y
+  **🧠 Por turnos** (un solo personaje por persona, sin prisa: con el móvil en la
+  frente vas preguntando a los demás hasta adivinar y luego pasas el móvil).
+  Base de datos de futbolistas, streamers/influencers (España y Latinoamérica),
+  deportistas españoles de élite, música, cine y ficción. Se juega con botones o
+  con el sensor de inclinación. La lista está en `src/lib/personajes.js`.
+  *(Guiño oculto: muy de vez en cuando se cuela alguien del propio grupo —
+  incluido tú mismo— sin avisar.)*
 - **🏆 Ranking** — dos marcadores: puntos de misiones y "marcador del cuerpo".
 - **📸 Álbum** — galería compartida de fotos y vídeos cortos (máx. 15s), con
   reacciones, para las mejores (y peores) capturas del viaje.

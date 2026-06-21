@@ -22,16 +22,17 @@ function barajar(arr) {
 }
 
 export default function QuienSoy() {
-  const [usuarios, setUsuarios] = useState([])
-
   // Configuración de la partida
   const [catsSel, setCatsSel] = useState(() => new Set(CATEGORIAS.map((c) => c.id)))
-  const [presentes, setPresentes] = useState(() => new Set())
-  const [incluirGrupo, setIncluirGrupo] = useState(true)
+  const [modo, setModo] = useState('rapido') // 'rapido' (contrarreloj) | 'turnos'
   const [duracion, setDuracion] = useState(90)
   const [modoInclinacion, setModoInclinacion] = useState(false)
 
-  // Estado del juego: 'config' | 'cuenta' | 'jugando' | 'fin'
+  // Los del viaje se cuelan en secreto (incluido tú mismo). No se enseña en la
+  // pantalla de ajustes: forma parte de la sorpresa.
+  const grupoNombresRef = useRef([])
+
+  // Estado del juego: 'config' | 'preparar' | 'cuenta' | 'jugando' | 'fin'
   const [fase, setFase] = useState('config')
   const [cuenta, setCuenta] = useState(3)
   const [tiempo, setTiempo] = useState(0)
@@ -55,9 +56,7 @@ export default function QuienSoy() {
       .order('nombre')
       .then(({ data }) => {
         if (!activo) return
-        const lista = data ?? []
-        setUsuarios(lista)
-        setPresentes(new Set(lista.map((u) => u.id)))
+        grupoNombresRef.current = (data ?? []).map((u) => u.nombre)
       })
     return () => {
       activo = false
@@ -74,8 +73,7 @@ export default function QuienSoy() {
   }
 
   function poolGrupo() {
-    if (!incluirGrupo) return []
-    return usuarios.filter((u) => presentes.has(u.id)).map((u) => u.nombre)
+    return grupoNombresRef.current
   }
 
   function siguienteNombre() {
@@ -121,6 +119,16 @@ export default function QuienSoy() {
 
     recientesRef.current = []
     setResultados([])
+    if (modo === 'turnos') {
+      setFase('preparar')
+    } else {
+      setCuenta(3)
+      setFase('cuenta')
+    }
+  }
+
+  // En el modo por turnos, pasar el móvil a la siguiente persona y empezar su turno.
+  function siguienteTurno() {
     setCuenta(3)
     setFase('cuenta')
   }
@@ -151,7 +159,7 @@ export default function QuienSoy() {
       const primero = siguienteNombre()
       actualRef.current = primero
       setActual(primero)
-      setTiempo(duracion)
+      if (modo === 'rapido') setTiempo(duracion)
       setFase('jugando')
       return
     }
@@ -160,16 +168,16 @@ export default function QuienSoy() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase, cuenta])
 
-  // Cronómetro de la partida
+  // Cronómetro de la partida (solo en modo contrarreloj)
   useEffect(() => {
-    if (fase !== 'jugando') return
+    if (fase !== 'jugando' || modo !== 'rapido') return
     if (tiempo <= 0) {
       setFase('fin')
       return
     }
     const t = setTimeout(() => setTiempo((s) => s - 1), 1000)
     return () => clearTimeout(t)
-  }, [fase, tiempo])
+  }, [fase, tiempo, modo])
 
   // Sensor de inclinación durante la partida
   useEffect(() => {
@@ -208,11 +216,16 @@ export default function QuienSoy() {
     setResultados((r) => [...r, { nombre: actualRef.current, acierto: acerto }])
     setFeedback(acerto ? 'acierto' : 'paso')
     setTimeout(() => {
-      const sig = siguienteNombre()
-      actualRef.current = sig
-      setActual(sig)
       setFeedback(null)
       bloqueadoRef.current = false
+      if (modo === 'turnos') {
+        // Una carta por turno: se pasa el móvil al siguiente.
+        setFase('preparar')
+      } else {
+        const sig = siguienteNombre()
+        actualRef.current = sig
+        setActual(sig)
+      }
     }, 650)
   }
 
@@ -222,6 +235,34 @@ export default function QuienSoy() {
   }
 
   // --- Render ---
+  if (fase === 'preparar') {
+    const turno = resultados.length + 1
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center space-y-5">
+        <div className="text-6xl">🤳</div>
+        <h2 className="text-white font-black text-xl">Turno {turno}</h2>
+        <p className="text-white/60 text-sm max-w-xs">
+          Pásale el móvil a quien le toca. Cuando lo tenga{' '}
+          <b>en la frente</b> (sin mirar la pantalla), que pulse para ver su personaje.
+        </p>
+        <button
+          onClick={siguienteTurno}
+          className="w-full max-w-xs rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-black py-4 text-lg active:scale-[0.98] transition"
+        >
+          🙈 Ver mi personaje
+        </button>
+        {resultados.length > 0 && (
+          <button
+            onClick={() => setFase('fin')}
+            className="text-white/40 underline text-xs"
+          >
+            Terminar partida
+          </button>
+        )}
+      </div>
+    )
+  }
+
   if (fase === 'cuenta') {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -242,22 +283,28 @@ export default function QuienSoy() {
       <div
         className={`fixed inset-0 z-50 flex flex-col ${fondo} transition-colors duration-150`}
       >
-        {/* Tiempo */}
+        {/* Cabecera: tiempo (contrarreloj) o turno (por turnos) */}
         <div className="pt-4 text-center">
-          <span
-            className={`text-2xl font-black ${
-              tiempo <= 10 ? 'text-rose-300 animate-pulse' : 'text-white/70'
-            }`}
-          >
-            {tiempo}s
-          </span>
+          {modo === 'rapido' ? (
+            <span
+              className={`text-2xl font-black ${
+                tiempo <= 10 ? 'text-rose-300 animate-pulse' : 'text-white/70'
+              }`}
+            >
+              {tiempo}s
+            </span>
+          ) : (
+            <span className="text-sm font-semibold text-white/50">
+              Turno {resultados.length + 1} · pregunta a los demás
+            </span>
+          )}
         </div>
 
         {/* Nombre / feedback */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
           {feedback ? (
             <div className="text-6xl font-black text-white">
-              {feedback === 'acierto' ? '✅ ¡SÍ!' : '⏭️ PASO'}
+              {feedback === 'acierto' ? '✅ ¡SÍ!' : modo === 'turnos' ? '🏳️ FIN' : '⏭️ PASO'}
             </div>
           ) : (
             <div className="text-5xl sm:text-6xl font-black text-white leading-tight">
@@ -269,8 +316,8 @@ export default function QuienSoy() {
         {/* Controles */}
         {modoInclinacion ? (
           <div className="pb-8 text-center text-white/70 text-sm space-y-1">
-            <p>⬇️ Inclina abajo = <b>Acerté</b></p>
-            <p>⬆️ Inclina arriba = <b>Paso</b></p>
+            <p>⬇️ Inclina abajo = <b>{modo === 'turnos' ? '¡Lo adiviné!' : 'Acerté'}</b></p>
+            <p>⬆️ Inclina arriba = <b>{modo === 'turnos' ? 'Me rindo' : 'Paso'}</b></p>
             <button
               onClick={() => setFase('fin')}
               className="mt-3 text-white/40 underline text-xs"
@@ -285,13 +332,13 @@ export default function QuienSoy() {
                 onClick={() => resolver(false)}
                 className="rounded-2xl bg-white/15 hover:bg-white/25 text-white font-black py-6 text-lg active:scale-95 transition"
               >
-                ⏭️ Paso
+                {modo === 'turnos' ? '🏳️ Me rindo' : '⏭️ Paso'}
               </button>
               <button
                 onClick={() => resolver(true)}
                 className="rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black py-6 text-lg active:scale-95 transition"
               >
-                ✅ ¡Lo tiene!
+                {modo === 'turnos' ? '✅ ¡Lo adiviné!' : '✅ ¡Lo tiene!'}
               </button>
             </div>
             <button
@@ -311,10 +358,13 @@ export default function QuienSoy() {
     return (
       <div className="space-y-5">
         <div className="text-center">
-          <h2 className="text-white font-black text-lg">🏁 ¡Se acabó el tiempo!</h2>
+          <h2 className="text-white font-black text-lg">
+            {modo === 'rapido' ? '🏁 ¡Se acabó el tiempo!' : '🏁 Fin de la partida'}
+          </h2>
           <p className="text-6xl font-black text-amber-400 my-2">{aciertos}</p>
           <p className="text-white/50 text-sm">
-            {aciertos === 1 ? 'acierto' : 'aciertos'} de {resultados.length} cartas
+            {aciertos === 1 ? 'acierto' : 'aciertos'} de {resultados.length}{' '}
+            {modo === 'turnos' ? 'turnos' : 'cartas'}
           </p>
         </div>
 
@@ -358,14 +408,6 @@ export default function QuienSoy() {
       return n
     })
   }
-  const togglePresente = (id) => {
-    setPresentes((prev) => {
-      const n = new Set(prev)
-      if (n.has(id)) n.delete(id)
-      else n.add(id)
-      return n
-    })
-  }
 
   return (
     <div className="space-y-6">
@@ -373,8 +415,48 @@ export default function QuienSoy() {
         <h2 className="text-white font-black text-lg">🤳 ¿Quién soy?</h2>
         <p className="text-white/50 text-sm">
           Móvil en la frente. Los demás te dan pistas y tú adivinas quién eres.
-          Si lo pillas, ¡siguiente! ¿Te atreves?
         </p>
+      </div>
+
+      {/* Modo de juego */}
+      <div>
+        <p className="text-white/60 text-sm font-semibold mb-2">Modo de juego</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setModo('rapido')}
+            className={`rounded-xl p-3 text-left transition ${
+              modo === 'rapido'
+                ? 'bg-amber-500 text-black'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            <span className="block font-bold text-sm">⚡ Contrarreloj</span>
+            <span
+              className={`block text-xs ${
+                modo === 'rapido' ? 'text-black/70' : 'text-white/40'
+              }`}
+            >
+              Cuantos más aciertes, mejor.
+            </span>
+          </button>
+          <button
+            onClick={() => setModo('turnos')}
+            className={`rounded-xl p-3 text-left transition ${
+              modo === 'turnos'
+                ? 'bg-amber-500 text-black'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            <span className="block font-bold text-sm">🧠 Por turnos</span>
+            <span
+              className={`block text-xs ${
+                modo === 'turnos' ? 'text-black/70' : 'text-white/40'
+              }`}
+            >
+              Un personaje cada uno, sin prisa.
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Categorías */}
@@ -400,67 +482,27 @@ export default function QuienSoy() {
         </div>
       </div>
 
-      {/* Los del viaje */}
-      <div className="rounded-2xl bg-white/5 p-4 space-y-3">
-        <label className="flex items-center justify-between gap-3 cursor-pointer">
-          <span className="text-white text-sm font-semibold">
-            😈 Colar a los del viaje
-            <span className="block text-white/40 text-xs font-normal">
-              De vez en cuando saldrá uno del grupo… ¡hasta tú mismo!
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            checked={incluirGrupo}
-            onChange={(e) => setIncluirGrupo(e.target.checked)}
-            className="h-5 w-5 accent-amber-500"
-          />
-        </label>
-
-        {incluirGrupo && usuarios.length > 0 && (
-          <div>
-            <p className="text-white/40 text-xs mb-2">¿Quiénes estáis en la partida?</p>
-            <div className="flex flex-wrap gap-2">
-              {usuarios.map((u) => {
-                const on = presentes.has(u.id)
-                return (
-                  <button
-                    key={u.id}
-                    onClick={() => togglePresente(u.id)}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                      on
-                        ? 'bg-emerald-500/80 text-black'
-                        : 'bg-white/10 text-white/50 hover:bg-white/20'
-                    }`}
-                  >
-                    {u.nombre}
-                  </button>
-                )
-              })}
-            </div>
+      {/* Duración (solo en contrarreloj) */}
+      {modo === 'rapido' && (
+        <div>
+          <p className="text-white/60 text-sm font-semibold mb-2">Duración</p>
+          <div className="flex gap-2">
+            {DURACIONES.map((d) => (
+              <button
+                key={d}
+                onClick={() => setDuracion(d)}
+                className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition ${
+                  duracion === d
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-white/10 text-white/60 hover:bg-white/20'
+                }`}
+              >
+                {d}s
+              </button>
+            ))}
           </div>
-        )}
-      </div>
-
-      {/* Duración */}
-      <div>
-        <p className="text-white/60 text-sm font-semibold mb-2">Duración</p>
-        <div className="flex gap-2">
-          {DURACIONES.map((d) => (
-            <button
-              key={d}
-              onClick={() => setDuracion(d)}
-              className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition ${
-                duracion === d
-                  ? 'bg-amber-500 text-black'
-                  : 'bg-white/10 text-white/60 hover:bg-white/20'
-              }`}
-            >
-              {d}s
-            </button>
-          ))}
         </div>
-      </div>
+      )}
 
       {/* Modo de control */}
       <label className="flex items-center justify-between gap-3 cursor-pointer rounded-2xl bg-white/5 p-4">
@@ -488,8 +530,9 @@ export default function QuienSoy() {
       </button>
 
       <p className="text-center text-white/30 text-xs">
-        Pon el móvil en la frente (en horizontal), que el resto te vea la pantalla.
-        Te dan pistas sin decir el nombre y tú adivinas.
+        {modo === 'turnos'
+          ? 'Por turnos: a cada uno le toca un personaje. Con el móvil en la frente, pregunta a los demás (¿soy deportista?, ¿español?…) hasta adivinar. Sin prisa.'
+          : 'Contrarreloj: móvil en la frente (en horizontal), que el resto te vea la pantalla. Te dan pistas y vas acertando a contrarreloj.'}
       </p>
     </div>
   )
