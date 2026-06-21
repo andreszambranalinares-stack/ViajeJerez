@@ -22,14 +22,14 @@ function barajar(arr) {
 }
 
 export default function QuienSoy() {
-  const [usuarios, setUsuarios] = useState([])
-
   // Configuración de la partida
   const [catsSel, setCatsSel] = useState(() => new Set(CATEGORIAS.map((c) => c.id)))
-  const [presentes, setPresentes] = useState(() => new Set())
-  const [incluirGrupo, setIncluirGrupo] = useState(true)
   const [duracion, setDuracion] = useState(90)
   const [modoInclinacion, setModoInclinacion] = useState(false)
+
+  // Los del viaje se cuelan en secreto (incluido tú mismo). No se enseña en la
+  // pantalla de ajustes: forma parte de la sorpresa.
+  const grupoNombresRef = useRef([])
 
   // Estado del juego: 'config' | 'cuenta' | 'jugando' | 'fin'
   const [fase, setFase] = useState('config')
@@ -55,9 +55,7 @@ export default function QuienSoy() {
       .order('nombre')
       .then(({ data }) => {
         if (!activo) return
-        const lista = data ?? []
-        setUsuarios(lista)
-        setPresentes(new Set(lista.map((u) => u.id)))
+        grupoNombresRef.current = (data ?? []).map((u) => u.nombre)
       })
     return () => {
       activo = false
@@ -74,8 +72,7 @@ export default function QuienSoy() {
   }
 
   function poolGrupo() {
-    if (!incluirGrupo) return []
-    return usuarios.filter((u) => presentes.has(u.id)).map((u) => u.nombre)
+    return grupoNombresRef.current
   }
 
   function siguienteNombre() {
@@ -358,14 +355,6 @@ export default function QuienSoy() {
       return n
     })
   }
-  const togglePresente = (id) => {
-    setPresentes((prev) => {
-      const n = new Set(prev)
-      if (n.has(id)) n.delete(id)
-      else n.add(id)
-      return n
-    })
-  }
 
   return (
     <div className="space-y-6">
@@ -398,48 +387,6 @@ export default function QuienSoy() {
             )
           })}
         </div>
-      </div>
-
-      {/* Los del viaje */}
-      <div className="rounded-2xl bg-white/5 p-4 space-y-3">
-        <label className="flex items-center justify-between gap-3 cursor-pointer">
-          <span className="text-white text-sm font-semibold">
-            😈 Colar a los del viaje
-            <span className="block text-white/40 text-xs font-normal">
-              De vez en cuando saldrá uno del grupo… ¡hasta tú mismo!
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            checked={incluirGrupo}
-            onChange={(e) => setIncluirGrupo(e.target.checked)}
-            className="h-5 w-5 accent-amber-500"
-          />
-        </label>
-
-        {incluirGrupo && usuarios.length > 0 && (
-          <div>
-            <p className="text-white/40 text-xs mb-2">¿Quiénes estáis en la partida?</p>
-            <div className="flex flex-wrap gap-2">
-              {usuarios.map((u) => {
-                const on = presentes.has(u.id)
-                return (
-                  <button
-                    key={u.id}
-                    onClick={() => togglePresente(u.id)}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                      on
-                        ? 'bg-emerald-500/80 text-black'
-                        : 'bg-white/10 text-white/50 hover:bg-white/20'
-                    }`}
-                  >
-                    {u.nombre}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Duración */}
