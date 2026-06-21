@@ -7,9 +7,10 @@ Pensada para el móvil. Sin contraseñas: entras solo con tu nombre (y una foto 
 
 - **🍻 Contador del cuerpo** — cuenta cubatas, cervezas, finos, chupitos, cigarros,
   aguas... Toca y suma. Se sincroniza en vivo entre todos los móviles.
-- **🎯 Misiones diarias** — cada día hay **3 misiones** (2 fáciles = 1 punto, 1
-  difícil = 3 puntos), de broma y piques sanos entre vosotros. Las pone el
-  **administrador**, y él verifica si se han conseguido (o las rechaza).
+- **🎯 Misiones diarias** — cada día **cada uno escribe una misión** y, al
+  repartir, se asigna en secreto (estilo *amigo invisible*) a otra persona:
+  nadie recibe la suya y cada uno recibe una. Son de broma y piques sanos.
+  El **administrador** verifica si se han conseguido (o las rechaza).
 - **🏆 Ranking** — dos marcadores: puntos de misiones y "marcador del cuerpo".
 - **📸 Álbum** — galería compartida de fotos y vídeos cortos (máx. 15s), con
   reacciones, para las mejores (y peores) capturas del viaje.
@@ -68,14 +69,16 @@ Abre http://localhost:5173 en el móvil (misma wifi) o en el navegador.
 
 Dentro de la app, toca tu avatar (arriba a la derecha) → **Ajustes** → mete el
 **código de admin** (`VITE_ADMIN_CODE`, por defecto `jerez`). A partir de ahí
-puedes generar las misiones del día y verificar las de cada uno.
+puedes verificar las misiones de cada uno y reiniciar las del día. El reparto
+lo puede lanzar cualquiera en cuanto todos han escrito su misión.
 
 ## Notas
 
 - Es una app **privada entre amigos**: cualquiera con el enlace puede entrar y
   escribir. No metas datos sensibles.
-- El catálogo de consumiciones está en `src/lib/consumiciones.js` y el banco de
-  misiones en `src/lib/misionesPreset.js`. Tócalos a tu gusto.
+- El catálogo de consumiciones está en `src/lib/consumiciones.js`. Tócalo a tu
+  gusto. (En `src/lib/misionesPreset.js` queda el banco de ideas antiguo por si
+  alguien se queda sin inspiración al escribir su misión.)
 
 ## Ideas para más adelante
 

@@ -139,3 +139,17 @@ export function generarUnaDificil(dueño, todos = []) {
     objetivo_id: objetivo?.id ?? null,
   }
 }
+
+// Reparto "amigo invisible": dada la lista de IDs de autores (uno por misión),
+// devuelve un array de destinatarios del mismo tamaño que es una PERMUTACIÓN
+// de los autores en la que nadie recibe la suya (recipients[i] !== autores[i]).
+// Devuelve null si no es posible (hace falta al menos 2 autores).
+export function repartirSinRepetir(autores = []) {
+  const n = autores.length
+  if (n < 2) return null
+  for (let intento = 0; intento < 1000; intento++) {
+    const rec = barajar(autores)
+    if (rec.every((r, i) => r !== autores[i])) return rec
+  }
+  return null
+}
