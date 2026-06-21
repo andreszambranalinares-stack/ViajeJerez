@@ -9,6 +9,7 @@ import Galeria from './components/Galeria'
 import Resumen from './components/Resumen'
 import Predicciones from './components/Predicciones'
 import Ruleta from './components/Ruleta'
+import QuienSoy from './components/QuienSoy'
 import Wrapped from './components/Wrapped'
 import Ajustes from './components/Ajustes'
 import Avatar from './components/Avatar'
@@ -19,6 +20,7 @@ const TABS = [
   { id: 'misiones', label: 'Misiones', emoji: '🎯' },
   { id: 'predis', label: 'Predis', emoji: '🔮' },
   { id: 'ruleta', label: 'Ruleta', emoji: '🎰' },
+  { id: 'quiensoy', label: 'Quién soy', emoji: '🤳' },
   { id: 'resumen', label: 'Resumen', emoji: '📊' },
   { id: 'fotos', label: 'Álbum', emoji: '📸' },
 ]
@@ -117,6 +119,7 @@ function AppInterna() {
         {tab === 'misiones' && <Misiones />}
         {tab === 'predis' && <Predicciones />}
         {tab === 'ruleta' && <Ruleta />}
+        {tab === 'quiensoy' && <QuienSoy />}
         {tab === 'resumen' && (
           <div className="space-y-10">
             <Resumen />
@@ -128,7 +131,7 @@ function AppInterna() {
 
       {/* Barra de navegación inferior */}
       <nav className="fixed bottom-0 inset-x-0 z-30 bg-neutral-900/95 backdrop-blur border-t border-white/10">
-        <div className="max-w-md mx-auto grid grid-cols-6">
+        <div className="max-w-md mx-auto grid grid-cols-7">
           {TABS.map((t) => (
             <button
               key={t.id}
