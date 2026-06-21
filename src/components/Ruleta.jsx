@@ -1,6 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useUsuario } from '../context/UsuarioContext'
+import {
+  CHIP_VALUES,
+  betWins,
+  colorOf,
+  gkey,
+  payoutMultiplier,
+  shortChip,
+} from './roulette'
+import RouletteWheel from './RouletteWheel'
 
 const hoy = () => new Date().toLocaleDateString('sv')
 function inicioDeHoyISO() {
@@ -9,54 +18,69 @@ function inicioDeHoyISO() {
   return d.toISOString()
 }
 
-// Números rojos en la ruleta europea (el resto del 1-36 son negros; el 0 es verde).
-const ROJOS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36])
-const colorDe = (n) => (n === 0 ? 'verde' : ROJOS.has(n) ? 'rojo' : 'negro')
-const BG = { rojo: 'bg-red-600', negro: 'bg-neutral-800', verde: 'bg-green-600' }
-const enRango = (n, a, b) => n >= a && n <= b
+const fmt = (n) =>
+  new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(Math.round(n))
 
-// ¿La apuesta (token) acierta con el número que sale?
-function cumple(token, n) {
-  if (token.startsWith('num:')) return n === Number(token.slice(4))
-  switch (token) {
-    case 'rojo': return ROJOS.has(n)
-    case 'negro': return n !== 0 && !ROJOS.has(n)
-    case 'par': return n !== 0 && n % 2 === 0
-    case 'impar': return n % 2 === 1
-    case 'bajo': return enRango(n, 1, 18)
-    case 'alto': return enRango(n, 19, 36)
-    case 'docena1': return enRango(n, 1, 12)
-    case 'docena2': return enRango(n, 13, 24)
-    case 'docena3': return enRango(n, 25, 36)
-    default: return false
-  }
-}
-const multDe = (token) =>
-  token.startsWith('num:') ? 36 : token.startsWith('docena') ? 3 : 2
+const TOP_ROW = Array.from({ length: 12 }, (_, i) => (i + 1) * 3)
+const MID_ROW = Array.from({ length: 12 }, (_, i) => (i + 1) * 3 - 1)
+const BOT_ROW = Array.from({ length: 12 }, (_, i) => (i + 1) * 3 - 2)
 
-const labelDe = (token) => {
-  if (token.startsWith('num:')) return `Pleno ${token.slice(4)}`
-  return {
-    rojo: 'Rojo', negro: 'Negro', par: 'Par', impar: 'Impar',
-    bajo: '1-18', alto: '19-36',
-    docena1: '1ª (1-12)', docena2: '2ª (13-24)', docena3: '3ª (25-36)',
-  }[token] ?? token
+const NUM_BG = {
+  green: 'bg-[#15803d]',
+  red: 'bg-[#c81e1e]',
+  black: 'bg-[#1f2937]',
 }
+
+const COLS = 12
+const ROWS = 3
+const val = (c, r) => 3 * c + (3 - r)
+const colNums = (c) => [val(c, 0), val(c, 1), val(c, 2)]
+const px = (u) => (u / COLS) * 100
+const py = (u) => (u / ROWS) * 100
+
+const SPOTS = (() => {
+  const s = []
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS - 1; c++)
+      s.push({ key: gkey([val(c, r), val(c + 1, r)]), x: px(c + 1), y: py(r + 0.5) })
+  for (let c = 0; c < COLS; c++)
+    for (let r = 0; r < ROWS - 1; r++)
+      s.push({ key: gkey([val(c, r), val(c, r + 1)]), x: px(c + 0.5), y: py(r + 1) })
+  for (let r = 0; r < ROWS - 1; r++)
+    for (let c = 0; c < COLS - 1; c++)
+      s.push({
+        key: gkey([val(c, r), val(c + 1, r), val(c, r + 1), val(c + 1, r + 1)]),
+        x: px(c + 1), y: py(r + 1),
+      })
+  for (let c = 0; c < COLS; c++) s.push({ key: gkey(colNums(c)), x: px(c + 0.5), y: 96 })
+  for (let c = 0; c < COLS - 1; c++)
+    s.push({ key: gkey([...colNums(c), ...colNums(c + 1)]), x: px(c + 1), y: 96 })
+  s.push({ key: gkey([0, 3]), x: 1.5, y: py(0.5) })
+  s.push({ key: gkey([0, 2]), x: 1.5, y: py(1.5) })
+  s.push({ key: gkey([0, 1]), x: 1.5, y: py(2.5) })
+  s.push({ key: gkey([0, 1, 2, 3]), x: 1.5, y: 4 })
+  return s
+})()
 
 export default function Ruleta() {
   const { usuario } = useUsuario()
   const [consumiciones, setConsumiciones] = useState(0)
   const [neto, setNeto] = useState(0)
   const [historial, setHistorial] = useState([])
-  const [bet, setBet] = useState('rojo')
-  const [apuesta, setApuesta] = useState(1)
-  const [girando, setGirando] = useState(false)
-  const [display, setDisplay] = useState(0)
-  const [resultado, setResultado] = useState(null)
-  const [mensaje, setMensaje] = useState('')
-  const intervalRef = useRef(null)
+
+  const [bets, setBets] = useState({})
+  const [chip, setChip] = useState(CHIP_VALUES[0])
+  const [spinning, setSpinning] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+
+  const [spinToken, setSpinToken] = useState(0)
+  const [targetNumber, setTargetNumber] = useState(null)
+  const pendingResult = useRef(null)
 
   const saldo = consumiciones + neto
+  const total = useMemo(() => Object.values(bets).reduce((s, x) => s + x, 0), [bets])
+  const winningNumber = result?.number ?? null
 
   const cargar = async () => {
     const desde = inicioDeHoyISO()
@@ -88,68 +112,68 @@ export default function Ruleta() {
       .subscribe()
     return () => {
       supabase.removeChannel(canal)
-      if (intervalRef.current) clearInterval(intervalRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario.id])
 
-  useEffect(() => {
-    if (apuesta > saldo) setApuesta(Math.max(1, saldo))
-  }, [saldo]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const girar = async () => {
-    if (girando) return
-    const ap = Math.floor(Number(apuesta))
-    if (!ap || ap < 1) return setMensaje('Apuesta al menos 1 ficha.')
-    if (ap > saldo) return setMensaje('No tienes tantas fichas.')
-
-    setMensaje('')
-    setResultado(null)
-    setGirando(true)
-
-    const final = Math.floor(Math.random() * 37)
-    let ticks = 0
-    const total = 26
-    intervalRef.current = setInterval(() => {
-      ticks++
-      setDisplay(Math.floor(Math.random() * 37))
-      if (ticks >= total) {
-        clearInterval(intervalRef.current)
-        setDisplay(final)
-        finalizar(final, ap)
-      }
-    }, 85)
+  function place(key) {
+    if (spinning) return
+    if (total + chip > saldo) {
+      setError('No tienes fichas suficientes para esa apuesta')
+      return
+    }
+    setError(null)
+    setResult(null)
+    setBets((b) => ({ ...b, [key]: (b[key] ?? 0) + chip }))
   }
 
-  const finalizar = async (num, ap) => {
-    const mult = multDe(bet)
-    const gano = cumple(bet, num)
-    const ganancia = gano ? ap * (mult - 1) : -ap
-    setResultado({ num, gano, ganancia })
+  function clearBets() {
+    if (spinning) return
+    setBets({})
+    setResult(null)
+    setError(null)
+  }
+
+  function spin() {
+    if (spinning || total === 0) return
+    setSpinning(true)
+    setResult(null)
+    setError(null)
+
+    // El número lo decidimos aquí (app privada, fichas de cachondeo) y la rueda
+    // anima hacia él. El neto se guarda en ruleta_jugadas y recalcula el saldo.
+    const stake = total
+    const number = Math.floor(Math.random() * 37)
+    let payout = 0
+    for (const [k, a] of Object.entries(bets)) {
+      if (betWins(k, number)) payout += a * payoutMultiplier(k)
+    }
+    const net = Math.round(payout - stake)
+
+    pendingResult.current = { number, net, stake }
+    setTargetNumber(number)
+    setSpinToken((t) => t + 1)
+  }
+
+  async function onSettled() {
+    setSpinning(false)
+    const r = pendingResult.current
+    if (!r) return
+    setResult({ number: r.number, net: r.net })
+    setBets({})
     await supabase.from('ruleta_jugadas').insert({
       usuario_id: usuario.id,
       fecha: hoy(),
-      apuesta: ap,
-      color: bet,
-      resultado: num,
-      gano,
-      ganancia,
+      apuesta: r.stake,
+      color: 'mesa',
+      resultado: r.number,
+      gano: r.net > 0,
+      ganancia: r.net,
     })
-    setGirando(false)
     cargar()
   }
 
-  const SelBtn = ({ token, children, className = '' }) => (
-    <button
-      onClick={() => setBet(token)}
-      disabled={girando}
-      className={`rounded-lg py-2 text-sm font-bold text-white transition ${className || 'bg-white/10'} ${
-        bet === token ? 'ring-2 ring-amber-400' : 'opacity-75'
-      }`}
-    >
-      {children}
-    </button>
-  )
+  const cellProps = { bets, winningNumber, spinning, onPlace: place }
 
   return (
     <div className="space-y-5">
@@ -161,111 +185,122 @@ export default function Ruleta() {
       {/* Saldo */}
       <div className="rounded-2xl bg-gradient-to-br from-amber-500/20 to-yellow-700/10 ring-1 ring-amber-400/40 p-4 text-center">
         <p className="text-white/60 text-sm">Tus fichas de hoy</p>
-        <p className="text-5xl font-black text-amber-400">{saldo}</p>
+        <p className="text-5xl font-black text-amber-400">{fmt(saldo)}</p>
         <p className="text-white/40 text-xs">
           {consumiciones} de consumiciones {neto !== 0 && `· ${neto > 0 ? '+' : ''}${neto} en la ruleta`}
         </p>
       </div>
 
-      {/* Número girando */}
-      <div className="flex justify-center">
-        <div
-          className={`w-32 h-32 rounded-full flex items-center justify-center text-6xl font-black text-white ring-4 ring-white/20 transition-colors ${BG[colorDe(display)]} ${girando ? 'animate-pulse' : ''}`}
-        >
-          {display}
-        </div>
-      </div>
+      <RouletteWheel spinToken={spinToken} targetNumber={targetNumber} onSettled={onSettled} />
 
-      {resultado && !girando && (
-        <p className={`text-center font-bold text-lg ${resultado.gano ? 'text-emerald-400' : 'text-rose-400'}`}>
-          {resultado.gano
-            ? `🎉 ¡Salió ${resultado.num}! Ganas +${resultado.ganancia} fichas`
-            : `💀 Salió ${resultado.num}. Pierdes ${Math.abs(resultado.ganancia)} fichas`}
-        </p>
+      {result && (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center">
+          <span className="text-sm text-white/50">Salió el </span>
+          <span className={`mx-1 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold text-white ${NUM_BG[colorOf(result.number)]}`}>
+            {result.number}
+          </span>
+          <span className="ml-1 text-sm font-semibold">
+            {result.net > 0 ? (
+              <span className="text-emerald-400">¡Ganaste +{fmt(result.net)}!</span>
+            ) : result.net < 0 ? (
+              <span className="text-rose-400">Perdiste {fmt(-result.net)}</span>
+            ) : (
+              <span className="text-white/50">Recuperaste tu apuesta</span>
+            )}
+          </span>
+        </div>
       )}
 
-      {/* Elegir apuesta */}
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2">
-          <SelBtn token="rojo" className={BG.rojo}>🔴 Rojo · x2</SelBtn>
-          <SelBtn token="negro" className={BG.negro}>⚫ Negro · x2</SelBtn>
-          <SelBtn token="par">Par · x2</SelBtn>
-          <SelBtn token="impar">Impar · x2</SelBtn>
-          <SelBtn token="bajo">1-18 · x2</SelBtn>
-          <SelBtn token="alto">19-36 · x2</SelBtn>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <SelBtn token="docena1">1ª · x3</SelBtn>
-          <SelBtn token="docena2">2ª · x3</SelBtn>
-          <SelBtn token="docena3">3ª · x3</SelBtn>
-        </div>
-        <p className="text-white/50 text-xs">Pleno (a un número) · paga x36</p>
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: 37 }, (_, n) => {
-            const token = `num:${n}`
-            return (
-              <button
-                key={n}
-                onClick={() => setBet(token)}
-                disabled={girando}
-                className={`aspect-square rounded text-xs font-bold text-white transition ${BG[colorDe(n)]} ${
-                  bet === token ? 'ring-2 ring-amber-400' : 'opacity-75'
-                }`}
-              >
-                {n}
-              </button>
-            )
-          })}
+      {error && <p className="text-center text-sm text-rose-400">{error}</p>}
+
+      <div className="overflow-x-auto">
+        <div className="mx-auto min-w-[460px] max-w-xl space-y-1 rounded-xl bg-[#0e5a34] p-1.5">
+          <div className="flex gap-px">
+            <Cell {...cellProps} betKey="g:0" className={`w-8 shrink-0 self-stretch ${NUM_BG.green}`}>0</Cell>
+
+            <div className="relative flex-1">
+              <div className="grid grid-cols-12 gap-px">
+                {TOP_ROW.map((n) => <NumberCell key={n} n={n} {...cellProps} />)}
+                {MID_ROW.map((n) => <NumberCell key={n} n={n} {...cellProps} />)}
+                {BOT_ROW.map((n) => <NumberCell key={n} n={n} {...cellProps} />)}
+              </div>
+              <div className="pointer-events-none absolute inset-0">
+                {SPOTS.map((sp) => <Hotspot key={sp.key} sp={sp} {...cellProps} />)}
+              </div>
+            </div>
+
+            <div className="flex w-11 shrink-0 flex-col gap-px">
+              {[3, 2, 1].map((c) => (
+                <Cell {...cellProps} key={c} betKey={`column:${c}`} className="h-10 bg-[#0b7a43] text-[9px] leading-tight">2 a 1</Cell>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-px">
+            <div className="w-8 shrink-0" aria-hidden />
+            <div className="grid flex-1 grid-cols-3 gap-px">
+              <Cell {...cellProps} betKey="dozen:1" className="h-9 bg-[#0b7a43] text-[10px]">1-12</Cell>
+              <Cell {...cellProps} betKey="dozen:2" className="h-9 bg-[#0b7a43] text-[10px]">13-24</Cell>
+              <Cell {...cellProps} betKey="dozen:3" className="h-9 bg-[#0b7a43] text-[10px]">25-36</Cell>
+            </div>
+            <div className="w-11 shrink-0" aria-hidden />
+          </div>
+
+          <div className="flex gap-px">
+            <div className="w-8 shrink-0" aria-hidden />
+            <div className="grid flex-1 grid-cols-6 gap-px">
+              <Cell {...cellProps} betKey="low" className="h-9 bg-[#0b7a43] text-[10px]">1-18</Cell>
+              <Cell {...cellProps} betKey="even" className="h-9 bg-[#0b7a43] text-[10px]">PAR</Cell>
+              <Cell {...cellProps} betKey="red" className="h-9 bg-[#c81e1e] text-base">◆</Cell>
+              <Cell {...cellProps} betKey="black" className="h-9 bg-[#1f2937] text-base">◆</Cell>
+              <Cell {...cellProps} betKey="odd" className="h-9 bg-[#0b7a43] text-[10px]">IMPAR</Cell>
+              <Cell {...cellProps} betKey="high" className="h-9 bg-[#0b7a43] text-[10px]">19-36</Cell>
+            </div>
+            <div className="w-11 shrink-0" aria-hidden />
+          </div>
         </div>
       </div>
 
-      {/* Cantidad */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-white/60 text-sm">
-            Apuestas a <span className="text-amber-400 font-bold">{labelDe(bet)}</span>
-          </span>
-          <span className="text-white font-bold">{apuesta} fichas</span>
-        </div>
-        <input
-          type="range"
-          min="1"
-          max={Math.max(1, saldo)}
-          value={apuesta}
-          disabled={girando || saldo < 1}
-          onChange={(e) => setApuesta(Number(e.target.value))}
-          className="w-full accent-amber-500"
-        />
-        <div className="flex gap-2">
-          {[1, 5, 10].map((n) => (
-            <button
-              key={n}
-              onClick={() => setApuesta(Math.min(saldo, n))}
-              disabled={girando || saldo < 1}
-              className="flex-1 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 text-white text-sm py-1.5"
-            >
-              {n}
+      <p className="text-center text-[11px] text-white/40">
+        Toca un número (pleno) o los <span className="font-semibold">bordes y esquinas</span> para
+        caballo, calle, cuadro y línea.
+      </p>
+
+      <div>
+        <div className="mb-1.5 text-xs font-medium text-white/50">Ficha seleccionada</div>
+        <div className="flex flex-wrap gap-2">
+          {CHIP_VALUES.map((v) => (
+            <button key={v} onClick={() => setChip(v)} disabled={spinning}
+              className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-xs font-bold transition disabled:opacity-50 ${
+                chip === v ? 'scale-110 border-amber-300 bg-amber-400 text-slate-900 shadow'
+                  : 'border-white/20 bg-white/10 text-white'
+              }`}>
+              {shortChip(v)}
             </button>
           ))}
-          <button
-            onClick={() => setApuesta(Math.max(1, saldo))}
-            disabled={girando || saldo < 1}
-            className="flex-1 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 text-white text-sm py-1.5"
-          >
-            Todo
-          </button>
         </div>
       </div>
 
-      {mensaje && <p className="text-rose-400 text-sm text-center">{mensaje}</p>}
+      <div className="flex items-center justify-between rounded-xl bg-white/10 px-4 py-2.5 text-sm">
+        <span className="text-white/50">Total apostado</span>
+        <span className="font-bold text-white">{fmt(total)} fichas</span>
+      </div>
 
-      <button
-        onClick={girar}
-        disabled={girando || saldo < 1}
-        className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-black py-4 text-lg transition"
-      >
-        {girando ? '🎡 Girando…' : saldo < 1 ? 'Bebe algo para tener fichas 😏' : '🎡 ¡GIRAR!'}
-      </button>
+      <div className="grid grid-cols-[1fr_2fr] gap-3">
+        <button onClick={clearBets} disabled={spinning || total === 0}
+          className="rounded-xl bg-white/10 px-4 py-2.5 font-semibold text-white transition active:scale-[0.98] disabled:opacity-40">
+          Limpiar
+        </button>
+        <button onClick={spin} disabled={spinning || total === 0 || saldo < 1}
+          className="rounded-xl bg-amber-500 px-4 py-2.5 font-black text-black transition active:scale-[0.98] disabled:opacity-40">
+          {spinning ? '🎡 Girando…' : saldo < 1 ? 'Bebe algo para tener fichas 😏' : '🎯 ¡GIRAR!'}
+        </button>
+      </div>
+
+      <p className="text-center text-[11px] text-white/30">
+        Pleno 35:1 · Caballo 17:1 · Calle 11:1 · Cuadro 8:1 · Línea 5:1 · Docena y columna 2:1 ·
+        Color, par/impar y mitades 1:1
+      </p>
 
       {/* Historial */}
       {historial.length > 0 && (
@@ -275,10 +310,10 @@ export default function Ruleta() {
             {historial.slice(0, 12).map((j) => (
               <span
                 key={j.id}
-                className={`text-white text-xs rounded-full px-2 py-1 ${BG[colorDe(j.resultado)]}`}
-                title={`${j.apuesta} a ${labelDe(j.color)}`}
+                className={`text-white text-xs rounded-full px-2 py-1 ${NUM_BG[colorOf(j.resultado)]}`}
+                title={`Apostaste ${j.apuesta} fichas`}
               >
-                {j.resultado} {j.gano ? `+${j.ganancia}` : j.ganancia}
+                {j.resultado} {j.ganancia > 0 ? `+${j.ganancia}` : j.ganancia}
               </span>
             ))}
           </div>
@@ -289,5 +324,54 @@ export default function Ruleta() {
         Las fichas son de cachondeo, no se canjean por nada (bueno, por gloria).
       </p>
     </div>
+  )
+}
+
+function NumberCell({ n, ...rest }) {
+  return (
+    <Cell {...rest} betKey={gkey([n])} className={`h-10 text-[11px] ${NUM_BG[colorOf(n)]}`}>
+      {n}
+    </Cell>
+  )
+}
+
+function ChipBadge({ amount, win }) {
+  return (
+    <span className={`flex h-5 w-5 items-center justify-center rounded-full border-2 bg-amber-400 text-[8px] font-bold leading-none text-slate-900 shadow-md ${
+      win ? 'border-yellow-200 ring-2 ring-yellow-300' : 'border-white'
+    }`}>
+      {shortChip(amount)}
+    </span>
+  )
+}
+
+function Cell({ betKey, bets, winningNumber, spinning, onPlace, className = '', children }) {
+  const amount = bets[betKey]
+  const win = winningNumber != null && betWins(betKey, winningNumber)
+  return (
+    <button type="button" onClick={() => onPlace(betKey)} disabled={spinning}
+      className={`relative flex items-center justify-center rounded-[3px] font-bold text-white transition active:brightness-110 disabled:cursor-default ${
+        win ? 'z-10 ring-2 ring-yellow-300' : ''
+      } ${className}`}>
+      {children}
+      {amount != null && (
+        <span className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+          <ChipBadge amount={amount} win={win} />
+        </span>
+      )}
+    </button>
+  )
+}
+
+function Hotspot({ sp, bets, winningNumber, spinning, onPlace }) {
+  const amount = bets[sp.key]
+  const win = winningNumber != null && betWins(sp.key, winningNumber)
+  return (
+    <button type="button" disabled={spinning} onClick={() => onPlace(sp.key)}
+      style={{ left: `${sp.x}%`, top: `${sp.y}%` }}
+      className="pointer-events-auto absolute z-30 flex h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 items-center justify-center disabled:cursor-default">
+      {amount != null ? <ChipBadge amount={amount} win={win} />
+        : <span className="h-1.5 w-1.5 rounded-full bg-white/25" />}
+    </button>
   )
 }
