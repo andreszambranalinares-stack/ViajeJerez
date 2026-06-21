@@ -213,6 +213,23 @@ export default function Ruleta() {
 
       {error && <p className="text-center text-sm text-rose-400">{error}</p>}
 
+      {/* Números recientes (los últimos 10 que han salido) */}
+      {historial.length > 0 && (
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-white/50">Números recientes</div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {historial.slice(0, 10).map((j) => (
+              <span
+                key={j.id}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ring-1 ring-white/10 ${NUM_BG[colorOf(j.resultado)]}`}
+              >
+                {j.resultado}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <div className="mx-auto min-w-[460px] max-w-xl space-y-1 rounded-xl bg-[#0e5a34] p-1.5">
           <div className="flex gap-px">
