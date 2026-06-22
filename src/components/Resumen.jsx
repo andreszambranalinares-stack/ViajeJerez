@@ -3,14 +3,7 @@ import { supabase } from '../supabaseClient'
 import { useUsuario } from '../context/UsuarioContext'
 import { TIPOS, labelDe } from '../lib/consumiciones'
 import Avatar from './Avatar'
-
-const hoy = () => new Date().toLocaleDateString('sv')
-
-function inicioDeHoyISO() {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
-}
+import { hoy, inicioDeHoyISO } from '../lib/fecha'
 
 export default function Resumen() {
   const { usuario } = useUsuario()

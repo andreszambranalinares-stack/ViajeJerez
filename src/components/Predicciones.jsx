@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useUsuario } from '../context/UsuarioContext'
 import Avatar from './Avatar'
-
-const hoy = () => new Date().toLocaleDateString('sv')
+import { hoy } from '../lib/fecha'
 
 export default function Predicciones() {
   const { usuario } = useUsuario()

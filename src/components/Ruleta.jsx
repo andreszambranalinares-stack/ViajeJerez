@@ -11,12 +11,7 @@ import {
 } from './roulette'
 import RouletteWheel from './RouletteWheel'
 
-const hoy = () => new Date().toLocaleDateString('sv')
-function inicioDeHoyISO() {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
-}
+import { hoy, inicioDeHoyISO } from '../lib/fecha'
 
 const fmt = (n) =>
   new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(Math.round(n))

@@ -14,6 +14,7 @@ import Wrapped from './components/Wrapped'
 import Ajustes from './components/Ajustes'
 import Avatar from './components/Avatar'
 import Logo from './components/Logo'
+import { hoy } from './lib/fecha'
 
 const TABS = [
   { id: 'contador', label: 'Contador', emoji: '🍻' },
@@ -46,12 +47,12 @@ function AppInterna() {
   // Una vez al día, recordamos hacer las predicciones (se guarda por dispositivo).
   useEffect(() => {
     if (!usuario) return
-    const clave = 'vicio.predis.' + new Date().toLocaleDateString('sv')
+    const clave = 'vicio.predis.' + hoy()
     if (!localStorage.getItem(clave)) setAvisoPredis(true)
   }, [usuario])
 
   const cerrarAvisoPredis = (irAPredis) => {
-    localStorage.setItem('vicio.predis.' + new Date().toLocaleDateString('sv'), '1')
+    localStorage.setItem('vicio.predis.' + hoy(), '1')
     setAvisoPredis(false)
     if (irAPredis) setTab('predis')
   }

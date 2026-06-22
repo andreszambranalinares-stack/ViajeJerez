@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useUsuario } from '../context/UsuarioContext'
 import { repartirSinRepetir, generarPresetsDiarios } from '../lib/misionesPreset'
+import { hoy } from '../lib/fecha'
 import Avatar from './Avatar'
 
-const hoy = () => new Date().toLocaleDateString('sv') // YYYY-MM-DD local
 const PUNTOS_MISION = 3
 
 export default function Misiones() {
